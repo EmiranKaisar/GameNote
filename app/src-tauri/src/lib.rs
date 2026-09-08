@@ -45,6 +45,8 @@ struct Manifest {
 struct AnnotationFile {
     schema_version: u32,
     annotations: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    organization: Option<Value>,
 }
 
 #[derive(Serialize)]
@@ -55,6 +57,8 @@ struct NativeProject {
     created_at: String,
     last_playhead_us: u64,
     annotations: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    organization: Option<Value>,
     video_path: String,
 }
 
@@ -180,6 +184,7 @@ fn save_project(
     updated_at: String,
     last_playhead_us: u64,
     annotations: Vec<Value>,
+    organization: Value,
 ) -> Result<String, String> {
     let source = PathBuf::from(&source_video_path);
     if !source.is_file() {
@@ -228,6 +233,7 @@ fn save_project(
         let annotation_file = AnnotationFile {
             schema_version: 1,
             annotations,
+            organization: Some(organization),
         };
         fs::write(
             temporary.join("manifest.json"),
@@ -308,6 +314,7 @@ fn open_project(project_dir: String) -> Result<NativeProject, String> {
         created_at: manifest.created_at,
         last_playhead_us: manifest.last_playhead_us,
         annotations: annotation_file.annotations,
+        organization: annotation_file.organization,
         video_path: video.to_string_lossy().into_owned(),
     })
 }

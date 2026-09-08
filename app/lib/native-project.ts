@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { Annotation } from '@/lib/project-file';
+import type { AnnotationOrganization } from '@/lib/annotation-organization';
 
 export type NativeProject = {
   title: string;
@@ -8,6 +9,7 @@ export type NativeProject = {
   createdAt: string;
   lastPlayheadUs: number;
   annotations: Annotation[];
+  organization?: AnnotationOrganization;
   videoPath: string;
 };
 

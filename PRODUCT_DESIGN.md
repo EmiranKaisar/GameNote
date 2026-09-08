@@ -1,8 +1,8 @@
-# Match Video Player — Product Design
+# Game Note — Product Design
 
 ## 1. Product Summary
 
-Match Video Player is a lightweight desktop and mobile app for coaches, athletes, analysts, and referees to review match footage and attach text and drawings to exact moments. Annotations are saved beside an unchanged copy of the video in a portable Project folder that can be reopened on macOS, Windows, iOS, or Android.
+Game Note is a lightweight desktop and mobile app for coaches, athletes, analysts, and referees to review match footage and attach text and drawings to exact moments. Annotations are saved beside an unchanged copy of the video in a portable Project folder that can be reopened on macOS, Windows, iOS, or Android.
 
 The shared product language is defined in [CONTEXT.md](./CONTEXT.md).
 
@@ -39,6 +39,8 @@ The shared product language is defined in [CONTEXT.md](./CONTEXT.md).
 - Undo and redo Drawing strokes.
 - Display Timeline Markers for saved Annotations.
 - Navigate between annotations and select one from the timeline.
+- Create, rename, collapse, reorder, and delete Topics in the **Annotations** sidebar.
+- Reorder Annotations and move them into or out of Topics with dedicated drag handles.
 - Save the Match Video and annotation information in a portable Project folder.
 - Recover safely from an interrupted or failed save.
 - Reopen and correctly present a Project on all target platforms.
@@ -50,7 +52,7 @@ The shared product language is defined in [CONTEXT.md](./CONTEXT.md).
 - Multiple videos in one Project.
 - Audio, voice, image, or file attachments.
 - Shape tools, player tracking, telestration animation, or automated match analysis.
-- Annotation categories, tagging, search, or reports.
+- Tags, search, filters, or reports.
 
 ## 5. Supported Platforms and Media
 
@@ -113,6 +115,16 @@ If an Annotation already exists within the same displayed frame, **Add Note** op
 4. All Timeline Markers, Notes, and Drawings appear at their saved positions.
 5. If the Project was created by a newer incompatible app version, the app opens it read-only when possible and explains why editing is unavailable.
 
+### 6.5 Organize annotations with Topics
+
+1. After a Match Video is open, the user selects **+ Topic** in the **Annotations** sidebar.
+2. An inline, focused name field appears. A Topic name is trimmed, must contain 1–80 Unicode characters, and need not be unique. `Enter` creates it; `Escape` cancels.
+3. A new Topic appears at the top. A newly created Annotation also appears at the top as unassigned; editing an existing Annotation preserves its position and Topic.
+4. The user drags an Annotation by its handle onto a Topic header to append it, between Topic children to place it precisely, or between top-level items to make it unassigned at that position.
+5. The user drags a Topic by its handle to reorder it among top-level Topics and unassigned Annotations. Its children move with it, and a Topic cannot be placed inside another Topic.
+6. Hovering an Annotation over a Topic shows a lime container highlight. Dragging a Topic shows only a top-level before/after insertion line.
+7. Deleting a Topic promotes its children, in their existing order, into the Topic's former top-level position. The Annotations themselves are never deleted.
+
 ## 7. Review View
 
 ```text
@@ -143,6 +155,16 @@ If an Annotation already exists within the same displayed frame, **Add Note** op
 - The Note editor is visible while adding, editing, or viewing an Annotation; otherwise it is collapsed.
 - Timeline Markers remain distinguishable at normal zoom. Markers at nearby times may stack visually, but each must remain individually selectable through keyboard navigation or an annotation list fallback.
 - The app clearly shows unsaved changes in the title bar or navigation bar.
+- The sidebar count badge counts Annotations only, not Topics.
+
+### Annotations sidebar
+
+- The top level freely interleaves Topics and unassigned Annotations.
+- Each Topic header contains a drag handle, collapse chevron, name, Annotation count, and overflow menu with **Rename** and **Delete Topic**.
+- Topic collapse state is session-only. Every Topic starts expanded when a Project opens.
+- **Previous Annotation** and **Next Annotation** traverse the flattened sidebar order. Selecting an Annotation inside a collapsed Topic automatically expands that Topic.
+- Timeline Markers remain chronological and are unaffected by sidebar organization.
+- Reordering and Topic assignment are pointer/touch operations in this release. Keyboard equivalents are deferred.
 
 ## 8. Annotation Interaction
 
@@ -252,9 +274,22 @@ My Match.matchproject/
       "createdAt": "2026-09-08T10:11:00Z",
       "updatedAt": "2026-09-08T10:13:00Z"
     }
-  ]
+  ],
+  "organization": {
+    "rootItems": [
+      { "type": "annotation", "id": "018f51bd-5dfa-7d15-9dce-f47579e203fb" },
+      { "type": "topic", "id": "topic-1" }
+    ],
+    "topics": [
+      { "id": "topic-1", "name": "Counter attacks", "annotationIds": [] }
+    ]
+  }
 }
 ```
+
+`organization` is optional and does not change `schemaVersion`. Projects without it open with all Annotations unassigned in chronological order and gain the field only on their next Save. Every valid Annotation is represented exactly once: either as a top-level annotation root item or in one Topic's `annotationIds`. Empty Topics persist.
+
+When organization data is damaged, Game Note keeps the first valid placement, removes invalid or duplicate references, and appends any otherwise unrepresented valid Annotations at the bottom as unassigned in chronological order. It reports this non-blocking recovery and writes the repaired structure only if the user later saves. An Annotation is deleted during recovery only when that Annotation's own record is invalid.
 
 The examples illustrate the contract rather than prescribing a programming language. Production readers must validate paths, bounds, identifiers, timestamps, sizes, and JSON types before using them.
 
@@ -266,7 +301,7 @@ The examples illustrate the contract rather than prescribing a programming langu
 - Canceling Annotation Mode restores the Annotation to its state before the current edit session.
 - Deleting an Annotation requires confirmation or provides a short-lived undo action.
 - If the embedded video is missing or its checksum differs, the app reports the issue and does not silently bind annotations to another video.
-- Corrupt annotations are isolated when possible: valid annotations remain available, the Project opens read-only, and the app offers diagnostics instead of overwriting the source.
+- Corrupt annotations are isolated when possible: valid annotations remain available and the app offers diagnostics instead of overwriting the source. Corrupt organization never deletes a valid Annotation.
 - Project imports must reject paths that escape the selected Project folder.
 
 ## 12. Accessibility and Localization
@@ -311,6 +346,16 @@ These are product targets for a representative modern device using a locally sto
 - Given different window sizes or device orientations, when an Annotation is shown, then every Stroke retains its position relative to the video image.
 - Given an existing Annotation on the displayed frame, when the user selects **Add Note**, then the existing Annotation opens for editing rather than creating a duplicate.
 
+### Topic organization
+
+- Given an open Match Video, when the user creates a valid Topic, then it appears at the top and persists after Save and reopen; without a Match Video, Topic creation is disabled.
+- Given a dragged Annotation over a Topic, when it is dropped on the header or between children, then it becomes a child at the indicated position.
+- Given a dragged Annotation between top-level items, when it is dropped, then it becomes unassigned at that exact position.
+- Given a dragged Topic, then only top-level insertion positions are offered and its children move with it.
+- Given a deleted Topic, then its children are promoted in order at the Topic's former position and no Annotation is deleted.
+- Given a manual organization order, **Previous** and **Next** follow its flattened Annotation order while Timeline Markers remain chronological.
+- Given damaged or duplicate organization references, then all valid Annotations remain accessible after deterministic recovery and the original file is unchanged until Save.
+
 ### Persistence and portability
 
 - Given an unsaved Project, when the user saves it, then the destination contains a video, manifest, and annotation data and the original video is unchanged.
@@ -327,11 +372,11 @@ These are product targets for a representative modern device using a locally sto
 - Annotation identity is timestamp-based rather than frame-number-based.
 - Text is plain text and drawings are freehand strokes.
 - The app is offline-first and does not require an account.
+- Topic organization is stored separately from Annotation content as an optional schema-v1 extension.
 
 ### Questions to validate with users
 
 - Should playback automatically pause briefly on annotated moments, or should markers remain passive?
-- Do analysts need an annotation list panel in MVP, especially for long matches with many markers?
 - Is one video per Project sufficient for the first release, or must first-half and second-half files be reviewed together?
 - Is copying large videos into a Project acceptable, or should desktop users also have an explicitly non-portable linked-video option?
 - Which additional codecs are essential for the users' actual cameras and capture workflows?

@@ -2,12 +2,14 @@
 
 import { ChangeEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, FilePlus2, FolderOpen, Maximize2, Menu, Pause, PenLine, Play, Redo2, RotateCcw, Save, SkipBack, SkipForward, Trash2, Undo2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { AnnotationOrganizer } from '@/components/annotation-organizer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
-import { Annotation, createPortableProject, Point, ProjectData, readPortableProject, readProjectFolder, saveProjectFolder, Stroke } from '@/lib/project-file';
+import { Annotation, createPortableProject, Point, ProjectData, readPortableProject, readProjectFolder, sanitizeAnnotations, saveProjectFolder, Stroke } from '@/lib/project-file';
 import { NativeProject, pickAndOpenNativeProject, pickNativeVideo, prepareNativeVideo, runsNatively, saveNativeProject } from '@/lib/native-project';
+import { addAnnotationAtTop, AnnotationOrganization, defaultOrganization, flattenAnnotationIds, normalizeOrganization, removeAnnotation } from '@/lib/annotation-organization';
 
 const COLORS = ['#ffffff', '#171717', '#ff4d4f', '#ffd43b', '#49d17d', '#55a7ff'];
 
@@ -51,14 +53,16 @@ export function ReviewPlayer() {
   const [title, setTitle] = useState('Untitled review'), [projectId, setProjectId] = useState<string>(() => crypto.randomUUID()), [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
   const [duration, setDuration] = useState(0), [currentTime, setCurrentTime] = useState(0), [playing, setPlaying] = useState(false), [volume, setVolume] = useState(1);
   const [annotations, setAnnotations] = useState<Annotation[]>([]), [selectedId, setSelectedId] = useState<string | null>(null);
+  const [organization, setOrganization] = useState<AnnotationOrganization>(() => defaultOrganization([]));
   const [draft, setDraft] = useState<Annotation | null>(null), [originalDraft, setOriginalDraft] = useState<Annotation | null>(null), [redoStack, setRedoStack] = useState<Stroke[]>([]);
   const [penActive, setPenActive] = useState(false), [penColor, setPenColor] = useState(COLORS[2]);
   const [dirty, setDirty] = useState(false), [saving, setSaving] = useState(false), [status, setStatus] = useState('Open a match video to begin reviewing.');
-  const [showSidebar, setShowSidebar] = useState(false), [deleted, setDeleted] = useState<Annotation | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false), [deleted, setDeleted] = useState<{ annotation: Annotation; organization: AnnotationOrganization } | null>(null);
 
   const selected = useMemo(() => annotations.find((item) => item.id === selectedId) ?? null, [annotations, selectedId]);
   const displayed = draft ?? selected;
   const sorted = useMemo(() => [...annotations].sort((a, b) => a.timeUs - b.timeUs), [annotations]);
+  const organized = useMemo(() => { const byId = new Map(annotations.map((item) => [item.id, item])); return flattenAnnotationIds(organization).map((id) => byId.get(id)).filter((item): item is Annotation => Boolean(item)); }, [annotations, organization]);
   const native = runsNatively();
   const hasVideo = Boolean(videoFile || nativeVideoPath);
 
@@ -108,6 +112,7 @@ export function ReviewPlayer() {
         const annotation = emptyDraft(Math.round(latestTimeRef.current * 1_000_000));
         annotation.note = note.trim();
         setAnnotations((items) => [...items, annotation]);
+        setOrganization((current) => addAnnotationAtTop(current, annotation.id));
         setSelectedId(annotation.id);
         setDirty(true);
         setStatus('Text annotation added.');
@@ -122,8 +127,9 @@ export function ReviewPlayer() {
     if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl);
     setNativeVideoPath(null); setVideoFile(file); setVideoUrl(URL.createObjectURL(file)); setVideoMime(file.type || 'video/mp4'); setTitle(options?.title ?? file.name.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
-    setAnnotations(options?.annotations ?? []); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
-    setStatus(options ? 'Project opened.' : 'Video ready. Add a note at any important moment.');
+    const sanitized = sanitizeAnnotations(options?.annotations ?? []), loadedAnnotations = sanitized.annotations, normalized = normalizeOrganization(loadedAnnotations, options?.organization);
+    setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
+    setStatus(options ? sanitized.recovered || normalized.recovered ? 'Project opened. Damaged annotation data was repaired in memory; save to keep the repair.' : 'Project opened.' : 'Video ready. Add a note at any important moment.');
     requestAnimationFrame(() => { if (videoRef.current) videoRef.current.currentTime = (options?.lastPlayheadUs ?? 0) / 1_000_000; });
   };
   const loadNativeVideo = async (path: string, options?: NativeProject) => {
@@ -132,8 +138,9 @@ export function ReviewPlayer() {
     const filename = path.split(/[\\/]/).at(-1) ?? 'Match video';
     setVideoFile(null); setNativeVideoPath(path); setVideoUrl(prepared.url); setVideoMime(prepared.mediaType); setTitle(options?.title ?? filename.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
-    setAnnotations(options?.annotations ?? []); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
-    setStatus(options ? 'Project opened.' : 'Video ready. Add a note at any important moment.');
+    const sanitized = sanitizeAnnotations(options?.annotations ?? []), loadedAnnotations = sanitized.annotations, normalized = normalizeOrganization(loadedAnnotations, options?.organization);
+    setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
+    setStatus(options ? sanitized.recovered || normalized.recovered ? 'Project opened. Damaged annotation data was repaired in memory; save to keep the repair.' : 'Project opened.' : 'Video ready. Add a note at any important moment.');
     requestAnimationFrame(() => { if (videoRef.current) videoRef.current.currentTime = (options?.lastPlayheadUs ?? 0) / 1_000_000; });
   };
   const chooseVideo = async () => {
@@ -161,7 +168,7 @@ export function ReviewPlayer() {
   };
   const finishAnnotation = () => {
     if (!draft) return; const hasContent = draft.note.trim() || draft.drawing.strokes.length;
-    if (hasContent) { const saved = { ...draft, note: draft.note.trim(), updatedAt: new Date().toISOString() }; setAnnotations((items) => [...items.filter((item) => item.id !== saved.id), saved]); setSelectedId(saved.id); setDirty(true); setStatus('Annotation saved to this review.'); }
+    if (hasContent) { const saved = { ...draft, note: draft.note.trim(), updatedAt: new Date().toISOString() }; setAnnotations((items) => [...items.filter((item) => item.id !== saved.id), saved]); if (!originalDraft) setOrganization((current) => addAnnotationAtTop(current, saved.id)); setSelectedId(saved.id); setDirty(true); setStatus('Annotation saved to this review.'); }
     else { setSelectedId(null); setStatus('Empty annotation discarded.'); }
     setDraft(null); setOriginalDraft(null); setPenActive(false); setRedoStack([]);
   };
@@ -181,16 +188,16 @@ export function ReviewPlayer() {
   const endStroke = () => { currentStrokeRef.current = null; };
 
   const selectAnnotation = (annotation: Annotation) => { if (draft) return; videoRef.current?.pause(); seek(annotation.timeUs / 1_000_000); setSelectedId(annotation.id); setStatus(`Annotation at ${formatTime(annotation.timeUs / 1_000_000)}.`); };
-  const deleteSelected = () => { if (!selected) return; setDeleted(selected); setAnnotations((items) => items.filter((item) => item.id !== selected.id)); setSelectedId(null); setDirty(true); setStatus('Annotation deleted. Undo is available.'); };
-  const restoreDeleted = () => { if (!deleted) return; setAnnotations((items) => [...items, deleted]); setSelectedId(deleted.id); setDeleted(null); setDirty(true); setStatus('Annotation restored.'); };
-  const projectData = (): ProjectData | null => videoFile ? { title, projectId, createdAt, annotations: sorted, lastPlayheadUs: Math.round(currentTime * 1_000_000), video: videoFile } : null;
+  const deleteSelected = () => { if (!selected) return; setDeleted({ annotation: selected, organization }); setAnnotations((items) => items.filter((item) => item.id !== selected.id)); setOrganization((current) => removeAnnotation(current, selected.id)); setSelectedId(null); setDirty(true); setStatus('Annotation deleted. Undo is available.'); };
+  const restoreDeleted = () => { if (!deleted) return; setAnnotations((items) => [...items, deleted.annotation]); setOrganization(deleted.organization); setSelectedId(deleted.annotation.id); setDeleted(null); setDirty(true); setStatus('Annotation restored.'); };
+  const projectData = (): ProjectData | null => videoFile ? { title, projectId, createdAt, annotations: sorted, organization, lastPlayheadUs: Math.round(currentTime * 1_000_000), video: videoFile } : null;
   const downloadProject = (data: ProjectData) => { const url = URL.createObjectURL(createPortableProject(data)), anchor = document.createElement('a'); anchor.href = url; anchor.download = `${title.replace(/[^a-z0-9 _-]/gi, '_') || 'match-video'}.matchproject`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1_000); };
   const saveProject = async () => {
     if (!hasVideo) return;
     setSaving(true); setStatus('Saving project…');
     try {
       if (nativeVideoPath) {
-        const folder = await saveNativeProject({ sourceVideoPath: nativeVideoPath, title, projectId, createdAt, updatedAt: new Date().toISOString(), annotations: sorted, lastPlayheadUs: Math.round(currentTime * 1_000_000) });
+        const folder = await saveNativeProject({ sourceVideoPath: nativeVideoPath, title, projectId, createdAt, updatedAt: new Date().toISOString(), annotations: sorted, organization, lastPlayheadUs: Math.round(currentTime * 1_000_000) });
         if (!folder) { setStatus('Save canceled.'); return; }
         setStatus(`Project folder saved to ${folder}.`);
       } else {
@@ -216,7 +223,7 @@ export function ReviewPlayer() {
     else if (!typing && event.key === '.') seek(currentTime + 1 / 30);
     else if (event.key === 'Escape' && draft) cancelAnnotation();
   };
-  const adjacent = (direction: -1 | 1) => { if (!sorted.length) return; const index = sorted.findIndex((item) => item.id === selectedId); selectAnnotation(sorted[index < 0 ? (direction > 0 ? 0 : sorted.length - 1) : (index + direction + sorted.length) % sorted.length]); };
+  const adjacent = (direction: -1 | 1) => { if (!organized.length) return; const index = organized.findIndex((item) => item.id === selectedId); selectAnnotation(organized[index < 0 ? (direction > 0 ? 0 : organized.length - 1) : (index + direction + organized.length) % organized.length]); };
 
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);
@@ -270,7 +277,7 @@ export function ReviewPlayer() {
       <aside className={`annotation-sidebar ${showSidebar ? 'mobile-open' : ''}`} aria-label="Annotations">
         <div className="sidebar-header"><div><span className="eyebrow">MATCH REVIEW</span><h2>Annotations</h2></div><Badge variant="secondary">{annotations.length}</Badge></div>
         <div className="sidebar-nav"><Button variant="outline" size="icon-lg" onClick={() => adjacent(-1)} disabled={!annotations.length} aria-label="Previous annotation"><ChevronLeft /></Button><Button variant="outline" size="icon-lg" onClick={() => adjacent(1)} disabled={!annotations.length} aria-label="Next annotation"><ChevronRight /></Button><span>Jump between moments</span></div>
-        <div className="annotation-list">{sorted.length ? sorted.map((item, index) => <button key={item.id} className={`annotation-card ${selectedId === item.id ? 'selected' : ''}`} onClick={() => selectAnnotation(item)}><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span className="card-body"><strong>{formatTime(item.timeUs / 1_000_000)}</strong><span>{item.note || `${item.drawing.strokes.length} drawing stroke${item.drawing.strokes.length === 1 ? '' : 's'}`}</span></span><ChevronRight /></button>) : <div className="empty-list"><PenLine /><strong>No annotations yet</strong><span>Pause at a key moment and add your first note.</span></div>}</div>
+        <AnnotationOrganizer key={projectId} annotations={annotations} organization={organization} selectedId={selectedId} hasVideo={hasVideo} onSelect={selectAnnotation} onChange={(next, message) => { setOrganization(next); setDeleted(null); setDirty(true); setStatus(message); }} />
         <div className="sidebar-footer">
           <div className="mobile-project-actions"><Button variant="outline" size="lg" onClick={() => void chooseVideo()}><FilePlus2 />Open video</Button><Button variant="outline" size="lg" onClick={() => projectInputRef.current?.click()}><Upload />Open project</Button></div>
           {videoFile && <Button variant="outline" size="lg" onClick={exportPortable}><Download />Download portable file</Button>}

@@ -9,14 +9,30 @@ export type Annotation = {
   createdAt: string;
   updatedAt: string;
 };
+import type { AnnotationOrganization } from '@/lib/annotation-organization';
 export type ProjectData = {
   title: string;
   projectId: string;
   createdAt: string;
   lastPlayheadUs: number;
   annotations: Annotation[];
+  organization?: AnnotationOrganization;
   video: File;
 };
+
+export function sanitizeAnnotations(value: unknown): { annotations: Annotation[]; recovered: boolean } {
+  if (!Array.isArray(value)) return { annotations: [], recovered: true };
+  const seen = new Set<string>();
+  const annotations = value.filter((candidate): candidate is Annotation => {
+    if (!candidate || typeof candidate !== 'object') return false;
+    const item = candidate as Partial<Annotation>;
+    if (typeof item.id !== 'string' || !item.id || seen.has(item.id) || typeof item.timeUs !== 'number' || !Number.isFinite(item.timeUs) || item.timeUs < 0 || typeof item.note !== 'string' || item.note.length > 10_000 || typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string' || item.drawing?.coordinateSpace !== 'normalized-video-v1' || !Array.isArray(item.drawing.strokes)) return false;
+    const strokesValid = item.drawing.strokes.every((stroke) => stroke && typeof stroke.color === 'string' && typeof stroke.width === 'number' && Number.isFinite(stroke.width) && stroke.width > 0 && Array.isArray(stroke.points) && stroke.points.every((point) => point && typeof point.x === 'number' && Number.isFinite(point.x) && point.x >= 0 && point.x <= 1 && typeof point.y === 'number' && Number.isFinite(point.y) && point.y >= 0 && point.y <= 1));
+    if (!strokesValid) return false;
+    seen.add(item.id); return true;
+  });
+  return { annotations, recovered: annotations.length !== value.length };
+}
 
 type ProjectHeader = {
   manifest: {
@@ -30,7 +46,7 @@ type ProjectHeader = {
     annotationsPath: 'annotations.json';
     lastPlayheadUs: number;
   };
-  annotations: { schemaVersion: 1; annotations: Annotation[] };
+  annotations: { schemaVersion: 1; annotations: Annotation[]; organization?: AnnotationOrganization };
 };
 
 const MAGIC = new TextEncoder().encode('MVPJ0001');
@@ -52,7 +68,7 @@ function createHeader(data: ProjectData): ProjectHeader {
       video: { path: `video/${videoName}`, originalFilename: videoName, size: data.video.size, type: data.video.type || 'application/octet-stream' },
       annotationsPath: 'annotations.json', lastPlayheadUs: data.lastPlayheadUs,
     },
-    annotations: { schemaVersion: 1, annotations: data.annotations },
+    annotations: { schemaVersion: 1, annotations: data.annotations, organization: data.organization },
   };
 }
 
@@ -85,6 +101,7 @@ export async function readPortableProject(file: File): Promise<ProjectData> {
     title: header.manifest.title, projectId: header.manifest.projectId,
     createdAt: header.manifest.createdAt, lastPlayheadUs: header.manifest.lastPlayheadUs,
     annotations: header.annotations.annotations,
+    organization: header.annotations.organization,
     video: new File([videoBlob], header.manifest.video.originalFilename, { type: header.manifest.video.type }),
   };
 }
@@ -124,5 +141,5 @@ export async function readProjectFolder(): Promise<ProjectData> {
   const videoFolder = await folder.getDirectoryHandle('video');
   const video = await (await videoFolder.getFileHandle(manifest.video.originalFilename)).getFile();
   if (video.size !== manifest.video.size) throw new Error('The video does not match this project.');
-  return { title: manifest.title, projectId: manifest.projectId, createdAt: manifest.createdAt, lastPlayheadUs: manifest.lastPlayheadUs, annotations: annotations.annotations, video };
+  return { title: manifest.title, projectId: manifest.projectId, createdAt: manifest.createdAt, lastPlayheadUs: manifest.lastPlayheadUs, annotations: annotations.annotations, organization: annotations.organization, video };
 }

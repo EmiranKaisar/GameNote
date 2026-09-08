@@ -1,4 +1,4 @@
-# Match Video Review
+# Game Note
 
 This context defines the shared language for a lightweight, cross-platform app used to review match footage and attach observations without altering the source video.
 
@@ -19,6 +19,18 @@ _Avoid_: Cursor, scrubber
 **Annotation**:
 Saved review information anchored to a specific media timestamp and composed of a Note, a Drawing, or both.
 _Avoid_: Comment, marker, frame information
+
+**Topic**:
+A grouping with a required name used to organize Annotations in the annotation sidebar. Topic names need not be unique, and a Topic contains complete Annotations, including their Note, Drawing, and Annotation Time.
+_Avoid_: Folder, category, tag, note group
+
+**Unassigned Annotation**:
+An Annotation that does not belong to a Topic and appears directly in the annotation sidebar’s top-level order.
+_Avoid_: Uncategorized note, loose note
+
+**Annotation Organization**:
+The ordered arrangement of Topics and unassigned Annotations, including the ordered membership of each Topic. It is separate from Annotation content.
+_Avoid_: Sidebar layout, folder tree
 
 **Note**:
 The text portion of an Annotation.
