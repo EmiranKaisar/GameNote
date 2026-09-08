@@ -37,7 +37,7 @@ node_modules/
 .next/
 .vinext/
 dist/
-build/
+/build/
 out/
 coverage/
 .wrangler/
@@ -53,4 +53,3 @@ next-env.d.ts
 *.matchproject
 /videos/
 /samples/local/
-

@@ -1,29 +1,21 @@
 # Touchline
 
-Touchline is a lightweight match-video review app for coaches, athletes, analysts, and referees. It opens local footage and attaches timestamped notes and freehand drawings without modifying the source video.
+Touchline is a lightweight native match-video review app for coaches, athletes, analysts, and referees. It opens local footage and attaches timestamped notes and freehand drawings without modifying the source video.
 
-The application is an installable Progressive Web App that runs on macOS, Windows, iOS, and Android.
+The interface is React/Vite and the native shell is Tauri 2. It targets macOS, Windows, iOS, and Android while continuing to support a browser-only development build.
 
 ## Features
 
-- Open locally stored match videos.
+- Open locally stored MP4, MOV, M4V, WebM, MKV, and AVI files when the operating system supports their codecs.
 - Play, pause, seek, adjust volume, and enter fullscreen.
-- Add text notes at precise media timestamps.
-- Draw over the video with multiple pen colors.
-- Undo and redo drawing strokes.
-- Jump to annotations from the timeline or annotation list.
+- Add text notes and drawings at precise timestamps.
+- Choose pen colors and undo or redo strokes with `Ctrl+Z` / `Cmd+Z`.
+- See annotation markers on the timeline and jump between annotated moments.
 - Edit, delete, and restore annotations.
-- Save portable projects containing the video and annotation data.
-- Reopen project folders or portable `.matchproject` files.
-- Work offline after the application shell has been cached.
+- Save a `.matchproject` folder containing the source video, manifest, and annotation data.
+- Reopen project folders created by Touchline.
 
-## Requirements
-
-- Node.js 22.13 or newer.
-- npm 11 or newer.
-- A modern browser. Chromium-based browsers provide the fullest project-folder support.
-
-## Run locally
+## Run as a native app during development
 
 ```sh
 cd app
@@ -31,52 +23,48 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) unless the development server prints a different address. Select **Open video** to begin reviewing footage.
+`npm run dev` starts Vite automatically and opens Touchline in its own native window. You do not need to open a browser. Stop it with `Ctrl+C` in the terminal.
 
-## Core workflow
+For the browser-only frontend, use `npm run dev:web` and open [http://127.0.0.1:1420](http://127.0.0.1:1420).
 
-1. Open a supported local video.
-2. Pause or seek to an important moment.
-3. Select **Add note**, enter text, or activate the pen and draw over the video.
-4. Select **Done** to add the annotation marker to the timeline.
-5. Select **Save** to create a `.matchproject` folder in browsers with the File System Access API. Other browsers download one portable `.matchproject` file containing the same video and annotation data.
-6. Reopen a saved folder with **Open folder**, or a portable file with **Open file**.
-
-## Available commands
+## Build the macOS app
 
 ```sh
 cd app
-
-# Start the development server
-npm run dev
-
-# Run project-format tests
-npm test
-
-# Check application source
-npm run lint
-
-# Create a production build
-npm run build
+npm run build:mac
 ```
 
-## Platform notes
+Open `build/macos/Touchline.app` after the command finishes. All generated packages and Rust build caches stay under the repository-level `build/` folder, which is excluded by `.gitignore`.
 
-Video decoding depends on the browser and operating system. H.264 video with AAC audio in an MP4 or MOV container is the guaranteed compatibility baseline. Other formats such as MKV, AVI, and WebM work when the device browser supports their codecs.
+See [BUILDING.md](./BUILDING.md) for every platform command and one-time SDK setup.
 
-Chromium-based desktop browsers can create and reopen `.matchproject` folders through the File System Access API. Browsers without that API download a single portable `.matchproject` file instead. Project data and source videos remain local to the user's device.
+## Quality checks
+
+```sh
+cd app
+npm run typecheck
+npm run lint
+npm test
+npm run build:web
+```
 
 ## Project structure
 
 ```text
 .
-├── app/                 Application source and tests
-├── CONTEXT.md           Shared product terminology
-├── PRODUCT_DESIGN.md    Product behavior and acceptance criteria
-└── README.md            Setup and usage guide
+├── app/
+│   ├── components/       React application UI
+│   ├── lib/              Browser and native project bridges
+│   ├── scripts/          Cross-platform packaging scripts
+│   ├── src/              Vite entry point
+│   └── src-tauri/        Native Rust shell and file operations
+├── build/                Generated packages and caches (ignored)
+├── BUILDING.md           Platform build guide
+├── CONTEXT.md            Shared product terminology
+├── PRODUCT_DESIGN.md     Product behavior and acceptance criteria
+└── README.md
 ```
 
-## Documentation
+## Platform note
 
-- [Product design](./PRODUCT_DESIGN.md)
-- [Domain context](./CONTEXT.md)
+Video decoding is provided by each operating system WebView. H.264 video with AAC audio in MP4 or MOV is the safest compatibility baseline. A filename extension does not guarantee that the installed OS can decode the file’s internal codec.
