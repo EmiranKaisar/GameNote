@@ -38,6 +38,10 @@ function emptyDraft(timeUs: number): Annotation {
 
 const clone = (annotation: Annotation) => structuredClone(annotation);
 
+function BrandGlyph() {
+  return <svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="1" y="1" width="62" height="62" rx="15" fill="#080D0B"/><g stroke="#CAFF45" strokeWidth="3.5" strokeLinecap="round"><path d="M12 28V17a5 5 0 0 1 5-5h11M36 12h11a5 5 0 0 1 5 5v11M12 36v11a5 5 0 0 0 5 5h11M36 52h11a5 5 0 0 0 5-5V36"/><path d="M18 43c8-10 16-15 27-19"/><path d="m39 22 7 1-3 6"/></g><circle cx="48" cy="20" r="4.5" fill="#FFB33E"/></svg>;
+}
+
 export function ReviewPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null), canvasRef = useRef<HTMLCanvasElement>(null), stageRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null), projectInputRef = useRef<HTMLInputElement>(null);
@@ -223,7 +227,7 @@ export function ReviewPlayer() {
     <input ref={videoInputRef} className="sr-only" type="file" accept="video/*,.mkv,.avi,.webm" onChange={onVideoChosen} />
     <input ref={projectInputRef} className="sr-only" type="file" accept=".matchproject,application/x-match-video-project" onChange={onProjectChosen} />
     <header className="app-header">
-      <div className="brand-lockup"><div className="brand-mark" aria-hidden="true"><span /></div><div><div className="brand-name">Game Note</div><div className="project-name">{title}{dirty ? ' •' : ''}</div></div></div>
+      <div className="brand-lockup"><div className="brand-mark"><BrandGlyph /></div><div><div className="brand-name">Game Note</div><div className="project-name">{title}{dirty ? ' •' : ''}</div></div></div>
       <nav className="header-actions" aria-label="Project actions">
         <Button variant="ghost" size="lg" onClick={() => void chooseVideo()}><FilePlus2 /><span className="desktop-label">Open video</span></Button>
         <Button variant="ghost" size="lg" onClick={() => projectInputRef.current?.click()}><Upload /><span className="desktop-label">Open file</span></Button>
@@ -236,7 +240,7 @@ export function ReviewPlayer() {
       <section className="player-column" aria-label="Video review workspace">
         <div ref={stageRef} className={`video-stage ${penActive ? 'is-drawing' : ''}`}>
           {videoUrl ? <video key={videoUrl} ref={videoRef} playsInline onLoadedMetadata={(event) => { setDuration(event.currentTarget.duration); event.currentTarget.volume = volume; drawCanvas(); }} onTimeUpdate={(event) => { setCurrentTime(event.currentTarget.currentTime); if (selected && Math.abs(event.currentTarget.currentTime - selected.timeUs / 1_000_000) > .05) setSelectedId(null); }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={(event) => setStatus(`Video could not be decoded or streamed (media error ${event.currentTarget.error?.code ?? 'unknown'}).`)}><source src={videoUrl} type={videoMime} /><track kind="captions" src="/empty.vtt" srcLang="en" label="Captions" /></video>
-            : <button className="empty-stage" onClick={() => void chooseVideo()}><span className="empty-icon"><Upload /></span><strong>Open a match video</strong><span>MP4, MOV, MKV, AVI, or WebM</span></button>}
+            : <button className="empty-stage" onClick={() => void chooseVideo()}><span className="empty-icon"><BrandGlyph /></span><strong>Open a match video</strong><span>MP4, MOV, MKV, AVI, or WebM</span></button>}
           <canvas ref={canvasRef} className="drawing-canvas" aria-label="Drawing layer" onPointerDown={beginStroke} onPointerMove={extendStroke} onPointerUp={endStroke} onPointerCancel={endStroke} />
           {displayed && !draft && <Badge className="overlay-badge">ANNOTATION · {formatTime(displayed.timeUs / 1_000_000)}</Badge>}
         </div>
