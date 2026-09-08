@@ -1,10 +1,21 @@
+use http::{
+    header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, RANGE},
+    response::Builder as ResponseBuilder,
+    StatusCode,
+};
+use http_range::HttpRange;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     fs,
+    io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
+    sync::{Arc, RwLock},
     time::{SystemTime, UNIX_EPOCH},
 };
+use tauri::State;
+
+struct VideoSource(Arc<RwLock<Option<PathBuf>>>);
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,6 +91,82 @@ fn media_type(path: &Path) -> &'static str {
         "avi" => "video/x-msvideo",
         "mkv" => "video/x-matroska",
         _ => "application/octet-stream",
+    }
+}
+
+#[tauri::command]
+fn prepare_video(path: String, source: State<'_, VideoSource>) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    if !path.is_file() {
+        return Err("The selected video no longer exists.".into());
+    }
+    let canonical = path
+        .canonicalize()
+        .map_err(|error| format!("The video path could not be opened: {error}"))?;
+    let mime = media_type(&canonical).to_string();
+    *source
+        .0
+        .write()
+        .map_err(|_| "The video source lock is unavailable.".to_string())? = Some(canonical);
+    Ok(mime)
+}
+
+fn stream_response(
+    request: http::Request<Vec<u8>>,
+    source: &Arc<RwLock<Option<PathBuf>>>,
+) -> Result<http::Response<Vec<u8>>, String> {
+    let path = source
+        .read()
+        .map_err(|_| "The video source lock is unavailable.".to_string())?
+        .clone()
+        .ok_or_else(|| "No video has been selected.".to_string())?;
+    let mut file = fs::File::open(&path).map_err(|error| error.to_string())?;
+    let length = file.metadata().map_err(|error| error.to_string())?.len();
+    let response = ResponseBuilder::new()
+        .header(CONTENT_TYPE, media_type(&path))
+        .header(ACCEPT_RANGES, "bytes");
+
+    if let Some(range_header) = request.headers().get(RANGE) {
+        let ranges = HttpRange::parse(
+            range_header
+                .to_str()
+                .map_err(|_| "The video byte range is invalid.".to_string())?,
+            length,
+        )
+        .map_err(|_| "The requested video byte range cannot be served.".to_string())?;
+        let range = ranges
+            .first()
+            .ok_or_else(|| "The requested video byte range is empty.".to_string())?;
+        let start = range.start;
+        let bytes_to_read = range.length.min(4 * 1024 * 1024);
+        if start >= length || bytes_to_read == 0 {
+            return ResponseBuilder::new()
+                .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                .header(CONTENT_RANGE, format!("bytes */{length}"))
+                .body(Vec::new())
+                .map_err(|error| error.to_string());
+        }
+        let end = start + bytes_to_read - 1;
+        let mut buffer = Vec::with_capacity(bytes_to_read as usize);
+        file.seek(SeekFrom::Start(start))
+            .map_err(|error| error.to_string())?;
+        file.take(bytes_to_read)
+            .read_to_end(&mut buffer)
+            .map_err(|error| error.to_string())?;
+        response
+            .status(StatusCode::PARTIAL_CONTENT)
+            .header(CONTENT_RANGE, format!("bytes {start}-{end}/{length}"))
+            .header(CONTENT_LENGTH, buffer.len())
+            .body(buffer)
+            .map_err(|error| error.to_string())
+    } else {
+        let mut buffer = Vec::with_capacity(length.min(4 * 1024 * 1024) as usize);
+        file.read_to_end(&mut buffer)
+            .map_err(|error| error.to_string())?;
+        response
+            .header(CONTENT_LENGTH, buffer.len())
+            .body(buffer)
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -227,9 +314,56 @@ fn open_project(project_dir: String) -> Result<NativeProject, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let video_source = Arc::new(RwLock::new(None));
+    let protocol_source = Arc::clone(&video_source);
     tauri::Builder::default()
+        .manage(VideoSource(video_source))
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![save_project, open_project])
+        .register_asynchronous_uri_scheme_protocol("stream", move |_context, request, responder| {
+            let response = stream_response(request, &protocol_source).unwrap_or_else(|error| {
+                ResponseBuilder::new()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(CONTENT_TYPE, "text/plain")
+                    .body(error.into_bytes())
+                    .expect("valid error response")
+            });
+            responder.respond(response);
+        })
+        .invoke_handler(tauri::generate_handler![
+            prepare_video,
+            save_project,
+            open_project
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Touchline");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn streams_requested_video_byte_range() {
+        let path = std::env::temp_dir().join(format!(
+            "touchline-stream-test-{}-{}.mp4",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::write(&path, b"0123456789").expect("write fixture");
+        let source = Arc::new(RwLock::new(Some(path.clone())));
+        let request = http::Request::builder()
+            .header(RANGE, "bytes=2-5")
+            .body(Vec::new())
+            .expect("valid request");
+
+        let response = stream_response(request, &source).expect("stream response");
+        assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
+        assert_eq!(response.headers()[CONTENT_RANGE], "bytes 2-5/10");
+        assert_eq!(response.body(), b"2345");
+
+        fs::remove_file(path).expect("remove fixture");
+    }
 }

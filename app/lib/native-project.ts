@@ -17,7 +17,13 @@ export type NativeSaveData = Omit<NativeProject, 'videoPath'> & {
 };
 
 export const runsNatively = () => isTauri();
-export const nativeVideoUrl = (path: string) => convertFileSrc(path);
+export async function prepareNativeVideo(path: string) {
+  const mediaType = await invoke<string>('prepare_video', { path });
+  return {
+    mediaType,
+    url: `${convertFileSrc(`video/${Date.now()}`, 'stream')}?v=${Date.now()}`,
+  };
+}
 
 export async function pickNativeVideo() {
   const result = await open({

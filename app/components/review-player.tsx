@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
 import { Annotation, createPortableProject, Point, ProjectData, readPortableProject, readProjectFolder, saveProjectFolder, Stroke } from '@/lib/project-file';
-import { NativeProject, nativeVideoUrl, pickAndOpenNativeProject, pickNativeVideo, runsNatively, saveNativeProject } from '@/lib/native-project';
+import { NativeProject, pickAndOpenNativeProject, pickNativeVideo, prepareNativeVideo, runsNatively, saveNativeProject } from '@/lib/native-project';
 
 const COLORS = ['#ffffff', '#171717', '#ff4d4f', '#ffd43b', '#49d17d', '#55a7ff'];
 
@@ -43,7 +43,7 @@ export function ReviewPlayer() {
   const videoInputRef = useRef<HTMLInputElement>(null), projectInputRef = useRef<HTMLInputElement>(null);
   const currentStrokeRef = useRef<Stroke | null>(null);
   const latestHasVideoRef = useRef(false), latestTimeRef = useRef(0);
-  const [videoFile, setVideoFile] = useState<File | null>(null), [nativeVideoPath, setNativeVideoPath] = useState<string | null>(null), [videoUrl, setVideoUrl] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null), [nativeVideoPath, setNativeVideoPath] = useState<string | null>(null), [videoUrl, setVideoUrl] = useState(''), [videoMime, setVideoMime] = useState('video/mp4');
   const [title, setTitle] = useState('Untitled review'), [projectId, setProjectId] = useState<string>(() => crypto.randomUUID()), [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
   const [duration, setDuration] = useState(0), [currentTime, setCurrentTime] = useState(0), [playing, setPlaying] = useState(false), [volume, setVolume] = useState(1);
   const [annotations, setAnnotations] = useState<Annotation[]>([]), [selectedId, setSelectedId] = useState<string | null>(null);
@@ -116,16 +116,17 @@ export function ReviewPlayer() {
   const canReplace = () => !dirty || window.confirm('Discard unsaved changes and continue?');
   const loadVideo = (file: File, options?: Partial<ProjectData>) => {
     if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl);
-    setNativeVideoPath(null); setVideoFile(file); setVideoUrl(URL.createObjectURL(file)); setTitle(options?.title ?? file.name.replace(/\.[^.]+$/, ''));
+    setNativeVideoPath(null); setVideoFile(file); setVideoUrl(URL.createObjectURL(file)); setVideoMime(file.type || 'video/mp4'); setTitle(options?.title ?? file.name.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
     setAnnotations(options?.annotations ?? []); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
     setStatus(options ? 'Project opened.' : 'Video ready. Add a note at any important moment.');
     requestAnimationFrame(() => { if (videoRef.current) videoRef.current.currentTime = (options?.lastPlayheadUs ?? 0) / 1_000_000; });
   };
-  const loadNativeVideo = (path: string, options?: NativeProject) => {
+  const loadNativeVideo = async (path: string, options?: NativeProject) => {
     if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl);
+    const prepared = await prepareNativeVideo(path);
     const filename = path.split(/[\\/]/).at(-1) ?? 'Match video';
-    setVideoFile(null); setNativeVideoPath(path); setVideoUrl(nativeVideoUrl(path)); setTitle(options?.title ?? filename.replace(/\.[^.]+$/, ''));
+    setVideoFile(null); setNativeVideoPath(path); setVideoUrl(prepared.url); setVideoMime(prepared.mediaType); setTitle(options?.title ?? filename.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
     setAnnotations(options?.annotations ?? []); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
     setStatus(options ? 'Project opened.' : 'Video ready. Add a note at any important moment.');
@@ -134,7 +135,7 @@ export function ReviewPlayer() {
   const chooseVideo = async () => {
     if (!canReplace()) return;
     if (!native) { videoInputRef.current?.click(); return; }
-    try { const path = await pickNativeVideo(); if (path) loadNativeVideo(path); }
+    try { const path = await pickNativeVideo(); if (path) await loadNativeVideo(path); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'The video could not be opened.'); }
   };
   const onVideoChosen = (event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (file && canReplace()) loadVideo(file); };
@@ -143,7 +144,7 @@ export function ReviewPlayer() {
     try { setStatus('Opening project…'); const project = await readPortableProject(file); loadVideo(project.video, project); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'The project could not be opened.'); }
   };
-  const openFolder = async () => { if (!canReplace()) return; try { setStatus('Opening project folder…'); if (native) { const project = await pickAndOpenNativeProject(); if (project) loadNativeVideo(project.videoPath, project); } else { const project = await readProjectFolder(); loadVideo(project.video, project); } } catch (error) { if ((error as DOMException)?.name !== 'AbortError') setStatus(error instanceof Error ? error.message : 'The folder could not be opened.'); } };
+  const openFolder = async () => { if (!canReplace()) return; try { setStatus('Opening project folder…'); if (native) { const project = await pickAndOpenNativeProject(); if (project) await loadNativeVideo(project.videoPath, project); } else { const project = await readProjectFolder(); loadVideo(project.video, project); } } catch (error) { if ((error as DOMException)?.name !== 'AbortError') setStatus(error instanceof Error ? error.message : 'The folder could not be opened.'); } };
   const togglePlayback = async () => { const video = videoRef.current; if (!hasVideo || !video) return; if (video.paused) { setSelectedId(null); await video.play(); } else video.pause(); };
   const seek = (seconds: number) => { const video = videoRef.current; if (!video) return; video.currentTime = Math.min(Math.max(seconds, 0), duration || 0); setCurrentTime(video.currentTime); };
 
@@ -234,7 +235,7 @@ export function ReviewPlayer() {
     <div className="workspace">
       <section className="player-column" aria-label="Video review workspace">
         <div ref={stageRef} className={`video-stage ${penActive ? 'is-drawing' : ''}`}>
-          {videoUrl ? <video ref={videoRef} src={videoUrl} playsInline onLoadedMetadata={(event) => { setDuration(event.currentTarget.duration); event.currentTarget.volume = volume; drawCanvas(); }} onTimeUpdate={(event) => { setCurrentTime(event.currentTarget.currentTime); if (selected && Math.abs(event.currentTarget.currentTime - selected.timeUs / 1_000_000) > .05) setSelectedId(null); }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={() => setStatus('This video format or codec is not supported on this device.')}><track kind="captions" src="/empty.vtt" srcLang="en" label="Captions" /></video>
+          {videoUrl ? <video key={videoUrl} ref={videoRef} playsInline onLoadedMetadata={(event) => { setDuration(event.currentTarget.duration); event.currentTarget.volume = volume; drawCanvas(); }} onTimeUpdate={(event) => { setCurrentTime(event.currentTarget.currentTime); if (selected && Math.abs(event.currentTarget.currentTime - selected.timeUs / 1_000_000) > .05) setSelectedId(null); }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={(event) => setStatus(`Video could not be decoded or streamed (media error ${event.currentTarget.error?.code ?? 'unknown'}).`)}><source src={videoUrl} type={videoMime} /><track kind="captions" src="/empty.vtt" srcLang="en" label="Captions" /></video>
             : <button className="empty-stage" onClick={() => void chooseVideo()}><span className="empty-icon"><Upload /></span><strong>Open a match video</strong><span>MP4, MOV, MKV, AVI, or WebM</span></button>}
           <canvas ref={canvasRef} className="drawing-canvas" aria-label="Drawing layer" onPointerDown={beginStroke} onPointerMove={extendStroke} onPointerUp={endStroke} onPointerCancel={endStroke} />
           {displayed && !draft && <Badge className="overlay-badge">ANNOTATION · {formatTime(displayed.timeUs / 1_000_000)}</Badge>}
