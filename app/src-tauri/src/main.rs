@@ -1,3 +1,3 @@
 fn main() {
-    touchline_lib::run();
+    game_note_lib::run();
 }

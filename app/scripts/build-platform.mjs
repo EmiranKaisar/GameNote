@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +7,8 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(appRoot, '..');
 const buildRoot = join(repositoryRoot, 'build');
 const cargoTarget = join(buildRoot, 'cargo');
+const productName = JSON.parse(readFileSync(join(appRoot, 'src-tauri', 'tauri.conf.json'), 'utf8')).productName;
+const normalizedProductName = productName.toLowerCase().replace(/[^a-z0-9]/g, '');
 const requested = process.argv[2];
 const host = process.platform;
 const npm = host === 'win32' ? 'npm.cmd' : 'npm';
@@ -64,6 +66,7 @@ function copyArtifacts(folder) {
     const source = join(folder, entry.name);
     if (entry.isDirectory()) {
       if (entry.name.endsWith('.app')) {
+        if (entry.name.toLowerCase().replace(/[^a-z0-9]/g, '') !== `${normalizedProductName}app`) continue;
         const destination = join(output, entry.name);
         cpSync(source, destination, { recursive: true });
         copied.push(destination);
@@ -71,6 +74,7 @@ function copyArtifacts(folder) {
         copyArtifacts(source);
       }
     } else if (wantedExtensions.has(extname(entry.name).toLowerCase())) {
+      if (!entry.name.toLowerCase().replace(/[^a-z0-9]/g, '').startsWith(normalizedProductName)) continue;
       const destination = join(output, basename(source));
       cpSync(source, destination);
       copied.push(destination);
@@ -89,5 +93,5 @@ if (!copied.length) {
   process.exit(1);
 }
 
-console.log(`\nTouchline ${requested} artifacts:`);
+console.log(`\nGame Note ${requested} artifacts:`);
 for (const artifact of copied) console.log(`- ${artifact}`);

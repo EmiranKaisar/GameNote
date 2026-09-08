@@ -74,7 +74,7 @@ function validateHeader(header: ProjectHeader) {
 export async function readPortableProject(file: File): Promise<ProjectData> {
   if (file.size < 12) throw new Error('This project file is incomplete.');
   const prefix = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-  if (!MAGIC.every((byte, index) => prefix[index] === byte)) throw new Error('This is not a Touchline project.');
+  if (!MAGIC.every((byte, index) => prefix[index] === byte)) throw new Error('This is not a Game Note project.');
   const headerSize = new DataView(prefix.buffer).getUint32(8, true);
   if (headerSize < 2 || headerSize > 16_000_000 || 12 + headerSize > file.size) throw new Error('The project metadata is invalid.');
   const header = JSON.parse(await file.slice(12, 12 + headerSize).text()) as ProjectHeader;

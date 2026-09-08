@@ -223,7 +223,7 @@ export function ReviewPlayer() {
     <input ref={videoInputRef} className="sr-only" type="file" accept="video/*,.mkv,.avi,.webm" onChange={onVideoChosen} />
     <input ref={projectInputRef} className="sr-only" type="file" accept=".matchproject,application/x-match-video-project" onChange={onProjectChosen} />
     <header className="app-header">
-      <div className="brand-lockup"><div className="brand-mark" aria-hidden="true"><span /></div><div><div className="brand-name">Touchline</div><div className="project-name">{title}{dirty ? ' •' : ''}</div></div></div>
+      <div className="brand-lockup"><div className="brand-mark" aria-hidden="true"><span /></div><div><div className="brand-name">Game Note</div><div className="project-name">{title}{dirty ? ' •' : ''}</div></div></div>
       <nav className="header-actions" aria-label="Project actions">
         <Button variant="ghost" size="lg" onClick={() => void chooseVideo()}><FilePlus2 /><span className="desktop-label">Open video</span></Button>
         <Button variant="ghost" size="lg" onClick={() => projectInputRef.current?.click()}><Upload /><span className="desktop-label">Open file</span></Button>

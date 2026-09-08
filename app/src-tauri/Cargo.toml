@@ -1,12 +1,12 @@
 [package]
-name = "touchline"
+name = "game-note"
 version = "0.1.0"
 description = "A lightweight match-video review application"
-authors = ["Touchline contributors"]
+authors = ["Game Note contributors"]
 edition = "2021"
 
 [lib]
-name = "touchline_lib"
+name = "game_note_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

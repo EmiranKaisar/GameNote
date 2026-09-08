@@ -1,4 +1,4 @@
-const CACHE = 'touchline-shell-v1';
+const CACHE = 'game-note-shell-v1';
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.svg'];
 
 self.addEventListener('install', (event) => {

@@ -202,8 +202,8 @@ fn save_project(
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let temporary = destination.join(format!(".touchline-{stamp}.tmp"));
-    let backup = destination.join(format!(".touchline-{stamp}.backup"));
+    let temporary = destination.join(format!(".game-note-{stamp}.tmp"));
+    let backup = destination.join(format!(".game-note-{stamp}.backup"));
 
     let save_result = (|| -> Result<(), String> {
         fs::create_dir_all(temporary.join("video")).map_err(|error| error.to_string())?;
@@ -270,7 +270,7 @@ fn open_project(project_dir: String) -> Result<NativeProject, String> {
     let root = PathBuf::from(project_dir);
     let manifest: Manifest = serde_json::from_slice(
         &fs::read(root.join("manifest.json"))
-            .map_err(|_| "This folder does not contain a Touchline manifest.".to_string())?,
+            .map_err(|_| "This folder does not contain a Game Note manifest.".to_string())?,
     )
     .map_err(|_| "The project manifest is damaged.".to_string())?;
     let annotation_file: AnnotationFile = serde_json::from_slice(
@@ -335,7 +335,7 @@ pub fn run() {
             open_project
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Touchline");
+        .expect("error while running Game Note");
 }
 
 #[cfg(test)]
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn streams_requested_video_byte_range() {
         let path = std::env::temp_dir().join(format!(
-            "touchline-stream-test-{}-{}.mp4",
+            "game-note-stream-test-{}-{}.mp4",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)

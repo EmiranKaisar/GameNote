@@ -30,5 +30,5 @@ test('portable project preserves video and annotation data', async () => {
 });
 
 test('portable project rejects invalid input', async () => {
-  await assert.rejects(() => readPortableProject(new File(['not a project'], 'broken.matchproject')), /not a Touchline project/);
+  await assert.rejects(() => readPortableProject(new File(['not a project'], 'broken.matchproject')), /not a Game Note project/);
 });

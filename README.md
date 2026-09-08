@@ -1,6 +1,6 @@
-# Touchline
+# Game Note
 
-Touchline is a lightweight native match-video review app for coaches, athletes, analysts, and referees. It opens local footage and attaches timestamped notes and freehand drawings without modifying the source video.
+Game Note is a lightweight native match-video review app for coaches, athletes, analysts, and referees. It opens local footage and attaches timestamped notes and freehand drawings without modifying the source video.
 
 The interface is React/Vite and the native shell is Tauri 2. It targets macOS, Windows, iOS, and Android while continuing to support a browser-only development build.
 
@@ -13,7 +13,7 @@ The interface is React/Vite and the native shell is Tauri 2. It targets macOS, W
 - See annotation markers on the timeline and jump between annotated moments.
 - Edit, delete, and restore annotations.
 - Save a `.matchproject` folder containing the source video, manifest, and annotation data.
-- Reopen project folders created by Touchline.
+- Reopen project folders created by Game Note.
 
 ## Run as a native app during development
 
@@ -23,7 +23,7 @@ npm ci
 npm run dev
 ```
 
-`npm run dev` starts Vite automatically and opens Touchline in its own native window. You do not need to open a browser. Stop it with `Ctrl+C` in the terminal.
+`npm run dev` starts Vite automatically and opens Game Note in its own native window. You do not need to open a browser. Stop it with `Ctrl+C` in the terminal.
 
 For the browser-only frontend, use `npm run dev:web` and open [http://127.0.0.1:1420](http://127.0.0.1:1420).
 
@@ -34,7 +34,7 @@ cd app
 npm run build:mac
 ```
 
-Open `build/macos/Touchline.app` after the command finishes. All generated packages and Rust build caches stay under the repository-level `build/` folder, which is excluded by `.gitignore`.
+Open `build/macos/Game Note.app` after the command finishes. All generated packages and Rust build caches stay under the repository-level `build/` folder, which is excluded by `.gitignore`.
 
 See [BUILDING.md](./BUILDING.md) for every platform command and one-time SDK setup.
 

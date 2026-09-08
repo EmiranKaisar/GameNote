@@ -1,4 +1,4 @@
-# Building Touchline
+# Building Game Note
 
 Every command is run from the `app/` directory. Generated installers, application bundles, and Cargo caches are written below the repository’s ignored `build/` directory.
 
@@ -23,7 +23,7 @@ cd app
 npm run build:mac
 ```
 
-Output: `build/macos/Touchline.app`
+Output: `build/macos/Game Note.app`
 
 Optional commands:
 

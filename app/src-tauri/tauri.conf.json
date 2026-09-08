@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Touchline",
+  "productName": "Game Note",
   "version": "0.1.0",
-  "identifier": "com.touchline.matchreview",
+  "identifier": "com.gamenote.matchreview",
   "build": {
     "beforeDevCommand": "npm run dev:web",
     "devUrl": "http://127.0.0.1:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Touchline",
+        "title": "Game Note",
         "width": 1440,
         "height": 900,
         "minWidth": 900,
