@@ -49,7 +49,7 @@ export function ReviewPlayer() {
   const videoInputRef = useRef<HTMLInputElement>(null), projectInputRef = useRef<HTMLInputElement>(null);
   const currentStrokeRef = useRef<Stroke | null>(null);
   const latestHasVideoRef = useRef(false), latestTimeRef = useRef(0);
-  const [videoFile, setVideoFile] = useState<File | null>(null), [nativeVideoPath, setNativeVideoPath] = useState<string | null>(null), [videoUrl, setVideoUrl] = useState(''), [videoMime, setVideoMime] = useState('video/mp4');
+  const [videoFile, setVideoFile] = useState<File | null>(null), [nativeVideoPath, setNativeVideoPath] = useState<string | null>(null), [nativeProjectDir, setNativeProjectDir] = useState<string | null>(null), [videoUrl, setVideoUrl] = useState(''), [videoMime, setVideoMime] = useState('video/mp4');
   const [title, setTitle] = useState('Untitled review'), [projectId, setProjectId] = useState<string>(() => crypto.randomUUID()), [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
   const [duration, setDuration] = useState(0), [currentTime, setCurrentTime] = useState(0), [playing, setPlaying] = useState(false), [volume, setVolume] = useState(1);
   const [annotations, setAnnotations] = useState<Annotation[]>([]), [selectedId, setSelectedId] = useState<string | null>(null);
@@ -125,7 +125,7 @@ export function ReviewPlayer() {
   const canReplace = () => !dirty || window.confirm('Discard unsaved changes and continue?');
   const loadVideo = (file: File, options?: Partial<ProjectData>) => {
     if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl);
-    setNativeVideoPath(null); setVideoFile(file); setVideoUrl(URL.createObjectURL(file)); setVideoMime(file.type || 'video/mp4'); setTitle(options?.title ?? file.name.replace(/\.[^.]+$/, ''));
+    setNativeVideoPath(null); setNativeProjectDir(null); setVideoFile(file); setVideoUrl(URL.createObjectURL(file)); setVideoMime(file.type || 'video/mp4'); setTitle(options?.title ?? file.name.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
     const sanitized = sanitizeAnnotations(options?.annotations ?? []), loadedAnnotations = sanitized.annotations, normalized = normalizeOrganization(loadedAnnotations, options?.organization);
     setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
@@ -136,7 +136,7 @@ export function ReviewPlayer() {
     if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl);
     const prepared = await prepareNativeVideo(path);
     const filename = path.split(/[\\/]/).at(-1) ?? 'Match video';
-    setVideoFile(null); setNativeVideoPath(path); setVideoUrl(prepared.url); setVideoMime(prepared.mediaType); setTitle(options?.title ?? filename.replace(/\.[^.]+$/, ''));
+    setVideoFile(null); setNativeVideoPath(path); setNativeProjectDir(options?.projectDir ?? null); setVideoUrl(prepared.url); setVideoMime(prepared.mediaType); setTitle(options?.title ?? filename.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
     const sanitized = sanitizeAnnotations(options?.annotations ?? []), loadedAnnotations = sanitized.annotations, normalized = normalizeOrganization(loadedAnnotations, options?.organization);
     setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
@@ -197,9 +197,10 @@ export function ReviewPlayer() {
     setSaving(true); setStatus('Saving project…');
     try {
       if (nativeVideoPath) {
-        const folder = await saveNativeProject({ sourceVideoPath: nativeVideoPath, title, projectId, createdAt, updatedAt: new Date().toISOString(), annotations: sorted, organization, lastPlayheadUs: Math.round(currentTime * 1_000_000) });
-        if (!folder) { setStatus('Save canceled.'); return; }
-        setStatus(`Project folder saved to ${folder}.`);
+        const saved = await saveNativeProject({ sourceVideoPath: nativeVideoPath, title, projectId, createdAt, updatedAt: new Date().toISOString(), annotations: sorted, organization, lastPlayheadUs: Math.round(currentTime * 1_000_000) }, nativeProjectDir);
+        if (!saved) { setStatus('Save canceled.'); return; }
+        setNativeProjectDir(saved.projectDir); setNativeVideoPath(saved.videoPath);
+        setStatus(nativeProjectDir ? 'Project saved.' : `Project folder saved to ${saved.projectDir}.`);
       } else {
         const data = projectData(); if (!data) return;
         const folder = await saveProjectFolder(data); if (!folder) downloadProject(data);

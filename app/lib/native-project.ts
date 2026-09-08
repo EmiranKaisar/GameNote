@@ -11,12 +11,15 @@ export type NativeProject = {
   annotations: Annotation[];
   organization?: AnnotationOrganization;
   videoPath: string;
+  projectDir: string;
 };
 
-export type NativeSaveData = Omit<NativeProject, 'videoPath'> & {
+export type NativeSaveData = Omit<NativeProject, 'videoPath' | 'projectDir'> & {
   sourceVideoPath: string;
   updatedAt: string;
 };
+
+export type NativeSaveResult = { projectDir: string; videoPath: string };
 
 export const runsNatively = () => isTauri();
 export async function prepareNativeVideo(path: string) {
@@ -42,8 +45,9 @@ export async function pickAndOpenNativeProject() {
   return invoke<NativeProject>('open_project', { projectDir: result });
 }
 
-export async function saveNativeProject(data: NativeSaveData) {
+export async function saveNativeProject(data: NativeSaveData, existingProjectDir?: string | null) {
+  if (existingProjectDir) return invoke<NativeSaveResult>('save_project', { ...data, existingProjectDir });
   const destination = await open({ multiple: false, directory: true });
   if (typeof destination !== 'string') return null;
-  return invoke<string>('save_project', { ...data, destinationDir: destination });
+  return invoke<NativeSaveResult>('save_project', { ...data, destinationDir: destination });
 }

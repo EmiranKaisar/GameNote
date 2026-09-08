@@ -60,6 +60,14 @@ struct NativeProject {
     #[serde(skip_serializing_if = "Option::is_none")]
     organization: Option<Value>,
     video_path: String,
+    project_dir: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeSaveResult {
+    project_dir: String,
+    video_path: String,
 }
 
 fn safe_name(value: &str) -> String {
@@ -177,7 +185,8 @@ fn stream_response(
 #[tauri::command]
 fn save_project(
     source_video_path: String,
-    destination_dir: String,
+    destination_dir: Option<String>,
+    existing_project_dir: Option<String>,
     title: String,
     project_id: String,
     created_at: String,
@@ -185,24 +194,47 @@ fn save_project(
     last_playhead_us: u64,
     annotations: Vec<Value>,
     organization: Value,
-) -> Result<String, String> {
+) -> Result<NativeSaveResult, String> {
     let source = PathBuf::from(&source_video_path);
     if !source.is_file() {
         return Err("The selected source video no longer exists.".into());
     }
-    let destination = PathBuf::from(destination_dir);
-    if !destination.is_dir() {
-        return Err("Choose an existing destination folder.".into());
-    }
-
     let video_name = safe_name(
         source
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or("match-video"),
     );
-    let project_name = format!("{}.matchproject", safe_name(&title));
-    let target = destination.join(project_name);
+    let (destination, target) = if let Some(existing) = existing_project_dir {
+        let target = PathBuf::from(existing);
+        if !target.is_dir() {
+            return Err("The existing Project folder is no longer available.".into());
+        }
+        let current: Manifest = serde_json::from_slice(
+            &fs::read(target.join("manifest.json"))
+                .map_err(|_| "The existing Project manifest is missing.".to_string())?,
+        )
+        .map_err(|_| "The existing Project manifest is damaged.".to_string())?;
+        if current.format != "match-video-project" || current.project_id != project_id {
+            return Err("The existing folder no longer matches this Project.".into());
+        }
+        let parent = target
+            .parent()
+            .ok_or_else(|| "The existing Project has no writable parent folder.".to_string())?
+            .to_path_buf();
+        (parent, target)
+    } else {
+        let destination = PathBuf::from(
+            destination_dir.ok_or_else(|| "Choose a destination folder.".to_string())?,
+        );
+        if !destination.is_dir() {
+            return Err("Choose an existing destination folder.".into());
+        }
+        let project_name = format!("{}.matchproject", safe_name(&title));
+        let target = destination.join(project_name);
+        (destination, target)
+    };
+    let saved_video_path = target.join("video").join(&video_name);
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -223,7 +255,7 @@ fn save_project(
             updated_at,
             video: VideoManifest {
                 path: format!("video/{video_name}"),
-                original_filename: video_name,
+                original_filename: video_name.clone(),
                 size: video_size,
                 r#type: media_type(&source).into(),
             },
@@ -268,7 +300,10 @@ fn save_project(
     if save_result.is_err() && temporary.exists() {
         let _ = fs::remove_dir_all(&temporary);
     }
-    save_result.map(|_| target.to_string_lossy().into_owned())
+    save_result.map(|_| NativeSaveResult {
+        project_dir: target.to_string_lossy().into_owned(),
+        video_path: saved_video_path.to_string_lossy().into_owned(),
+    })
 }
 
 #[tauri::command]
@@ -316,6 +351,7 @@ fn open_project(project_dir: String) -> Result<NativeProject, String> {
         annotations: annotation_file.annotations,
         organization: annotation_file.organization,
         video_path: video.to_string_lossy().into_owned(),
+        project_dir: root.to_string_lossy().into_owned(),
     })
 }
 
@@ -372,5 +408,53 @@ mod tests {
         assert_eq!(response.body(), b"2345");
 
         fs::remove_file(path).expect("remove fixture");
+    }
+
+    #[test]
+    fn saves_existing_project_back_to_the_same_folder() {
+        let root = std::env::temp_dir().join(format!(
+            "game-note-save-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("create fixture folder");
+        let source = root.join("source.mp4");
+        fs::write(&source, b"video-one").expect("write source video");
+
+        let first = save_project(
+            source.to_string_lossy().into_owned(),
+            Some(root.to_string_lossy().into_owned()),
+            None,
+            "Review".into(),
+            "project-1".into(),
+            "2026-09-08T00:00:00Z".into(),
+            "2026-09-08T00:01:00Z".into(),
+            0,
+            vec![],
+            serde_json::json!({ "rootItems": [], "topics": [] }),
+        )
+        .expect("first save");
+
+        fs::write(&source, b"video-two").expect("update source video");
+        let second = save_project(
+            source.to_string_lossy().into_owned(),
+            None,
+            Some(first.project_dir.clone()),
+            "Review".into(),
+            "project-1".into(),
+            "2026-09-08T00:00:00Z".into(),
+            "2026-09-08T00:02:00Z".into(),
+            1,
+            vec![],
+            serde_json::json!({ "rootItems": [], "topics": [] }),
+        )
+        .expect("overwrite save");
+
+        assert_eq!(second.project_dir, first.project_dir);
+        assert_eq!(fs::read(second.video_path).expect("read saved video"), b"video-two");
+        fs::remove_dir_all(root).expect("remove fixture folder");
     }
 }

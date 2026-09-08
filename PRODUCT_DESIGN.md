@@ -87,6 +87,8 @@ When a file cannot be decoded, the app must explain that the format or codec is 
 
 On mobile, the destination is selected through the platform file picker. If the provider cannot create a normal folder, the app may expose the same folder structure as a platform-recognized document package.
 
+The destination picker is shown only for a Project's first Save. After a Project has been saved or opened from an existing Project folder, **Save** atomically overwrites that exact Project folder without asking for a destination again. If the folder has moved, disappeared, or no longer identifies the same Project, Save stops with an error instead of writing elsewhere; the user can then reopen the Project or use a future **Save As** action.
+
 ### 6.2 Add an annotation
 
 1. The user pauses or seeks to an important moment.
@@ -225,6 +227,7 @@ My Match.matchproject/
 - The original video filename and extension are preserved when safe; collisions and unsafe characters are normalized.
 - Unknown manifest fields and newer optional fields are ignored when possible to support forward compatibility.
 - Save uses a temporary sibling file or directory followed by an atomic replacement where the platform supports it. A failed save must not corrupt the last valid Project.
+- An opened or previously saved native Project retains its exact folder location for direct overwrite on subsequent Saves.
 
 ### `manifest.json` example
 
@@ -359,6 +362,8 @@ These are product targets for a representative modern device using a locally sto
 ### Persistence and portability
 
 - Given an unsaved Project, when the user saves it, then the destination contains a video, manifest, and annotation data and the original video is unchanged.
+- Given an existing Project opened in Game Note, when the user selects **Save**, then the same Project folder is atomically replaced without showing a destination picker.
+- Given that the remembered Project folder is missing or now belongs to another Project, when the user selects **Save**, then no alternate folder is created and a clear error is shown.
 - Given a saved Project copied to another supported platform, when it is opened, then the same video, Annotation Times, Notes, Drawings, and Timeline Markers are presented.
 - Given a save interrupted before replacement, when the original Project is reopened, then its last successfully saved state remains valid.
 - Given a modified or missing embedded video, when the Project is opened, then the mismatch is reported and annotations are not silently shown over the wrong media.
