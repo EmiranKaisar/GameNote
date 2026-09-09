@@ -27,16 +27,92 @@ npm run dev
 
 For the browser-only frontend, use `npm run dev:web` and open [http://127.0.0.1:1420](http://127.0.0.1:1420).
 
-## Build the macOS app
+## Build for each platform
+
+Install Node.js 22.13 or newer, npm, and the stable Rust toolchain first. From a fresh checkout, install the JavaScript dependencies once:
 
 ```sh
 cd app
+npm ci
+```
+
+Each platform build validates `company-info.json`, builds the Vite frontend, compiles the Tauri/Rust native shell, packages the application, and collects the result under the repository-level `build/<platform>/` folder. The complete `build/` folder is excluded by `.gitignore`.
+
+### macOS
+
+Build macOS packages on a Mac. Install the Xcode command-line tools first with `xcode-select --install`, then run:
+
+```sh
+cd app
+npm ci
 npm run build:mac
 ```
 
-Open `build/macos/Game Note.app` after the command finishes. All generated packages and Rust build caches stay under the repository-level `build/` folder, which is excluded by `.gitignore`.
+The application is written to `build/macos/Game Note.app`. Optional packaging commands are:
 
-See [BUILDING.md](./BUILDING.md) for every platform command and one-time SDK setup.
+```sh
+npm run build:mac:dmg       # DMG installer
+npm run build:mac:universal # Intel + Apple Silicon universal app
+```
+
+### Windows
+
+Build Windows packages on Windows. Install Node.js, Rust with the MSVC toolchain, Microsoft C++ Build Tools, and WebView2, then run in PowerShell or Command Prompt:
+
+```powershell
+cd app
+npm ci
+npm run build:windows
+```
+
+The generated MSI and/or NSIS installer is collected in `build/windows/`. Production distribution normally also requires a Windows code-signing certificate.
+
+### Android
+
+Install Android Studio, the Android SDK and NDK, a supported JDK, Node.js, and Rust. Initialize the Android project once per fresh checkout:
+
+```sh
+cd app
+npm ci
+npm run mobile:init:android
+```
+
+After initialization, use this command for every development update:
+
+```sh
+cd app
+npm run build:android
+```
+
+APK and/or AAB artifacts are collected in `build/android/`. A release uploaded to an app store must be signed with your Android release key.
+
+### iOS
+
+Build iOS packages on a Mac with full Xcode, CocoaPods, Node.js, and Rust installed. Initialize the iOS project once per fresh checkout:
+
+```sh
+cd app
+npm ci
+npm run mobile:init:ios
+```
+
+After initialization, use this command for every development update:
+
+```sh
+cd app
+npm run build:ios
+```
+
+The iOS artifacts are collected in `build/ios/`. Installing on devices or distributing through TestFlight/App Store requires an Apple Developer account and valid signing configuration.
+
+| Target | Repeat-build command | Build host | Output |
+| --- | --- | --- | --- |
+| macOS | `npm run build:mac` | macOS | `build/macos/` |
+| Windows | `npm run build:windows` | Windows | `build/windows/` |
+| Android | `npm run build:android` | macOS, Windows, or Linux | `build/android/` |
+| iOS | `npm run build:ios` | macOS | `build/ios/` |
+
+Native desktop builds are not generally cross-compiled: run the macOS command on macOS and the Windows command on Windows. See [BUILDING.md](./BUILDING.md) for detailed SDK setup, signing, troubleshooting, and optional packaging commands.
 
 ## Company information
 
