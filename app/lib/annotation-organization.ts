@@ -15,6 +15,12 @@ export type AnnotationOrganization = {
   topics: AnnotationTopic[];
 };
 
+export type OrganizationDragItem = { type: 'annotation' | 'topic'; id: string };
+export type OrganizationDropTarget =
+  | { type: 'root'; index: number }
+  | { type: 'topic'; topicId: string }
+  | { type: 'topic-child'; topicId: string; index: number };
+
 export function defaultOrganization(annotations: Annotation[]): AnnotationOrganization {
   return {
     rootItems: [...annotations]
@@ -119,4 +125,39 @@ export function deleteTopic(organization: AnnotationOrganization, topicId: strin
   const rootItems = organization.rootItems.filter((item) => item.type !== 'topic' || item.id !== topicId);
   rootItems.splice(Math.max(0, index), 0, ...topic.annotationIds.map((id) => ({ type: 'annotation' as const, id })));
   return { rootItems, topics: organization.topics.filter((item) => item.id !== topicId) };
+}
+
+export function moveOrganizationItem(organization: AnnotationOrganization, active: OrganizationDragItem, target: OrganizationDropTarget): AnnotationOrganization {
+  if (active.type === 'topic' && target.type !== 'root') return organization;
+  const rootItems = [...organization.rootItems];
+  const topics = organization.topics.map((topic) => ({ ...topic, annotationIds: [...topic.annotationIds] }));
+
+  if (active.type === 'topic') {
+    if (target.type !== 'root') return organization;
+    const sourceIndex = rootItems.findIndex((item) => item.type === 'topic' && item.id === active.id);
+    if (sourceIndex < 0) return organization;
+    const [item] = rootItems.splice(sourceIndex, 1);
+    const index = Math.max(0, Math.min(rootItems.length, target.index - (sourceIndex < target.index ? 1 : 0)));
+    rootItems.splice(index, 0, item);
+    return { rootItems, topics };
+  }
+
+  const sourceRootIndex = rootItems.findIndex((item) => item.type === 'annotation' && item.id === active.id);
+  const sourceTopic = topics.find((topic) => topic.annotationIds.includes(active.id));
+  const sourceChildIndex = sourceTopic?.annotationIds.indexOf(active.id) ?? -1;
+  if (sourceRootIndex < 0 && !sourceTopic) return organization;
+  if (sourceRootIndex >= 0) rootItems.splice(sourceRootIndex, 1);
+  if (sourceTopic) sourceTopic.annotationIds.splice(sourceChildIndex, 1);
+
+  if (target.type === 'root') {
+    const index = Math.max(0, Math.min(rootItems.length, target.index - (sourceRootIndex >= 0 && sourceRootIndex < target.index ? 1 : 0)));
+    rootItems.splice(index, 0, { type: 'annotation', id: active.id });
+  } else {
+    const topic = topics.find((item) => item.id === target.topicId);
+    if (!topic) return organization;
+    const requestedIndex = target.type === 'topic' ? topic.annotationIds.length : target.index;
+    const index = Math.max(0, Math.min(topic.annotationIds.length, requestedIndex - (sourceTopic?.id === topic.id && sourceChildIndex < requestedIndex ? 1 : 0)));
+    topic.annotationIds.splice(index, 0, active.id);
+  }
+  return { rootItems, topics };
 }
