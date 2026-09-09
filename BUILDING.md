@@ -13,6 +13,10 @@ npm ci
 
 To install Rust on a new build machine, follow [rustup.rs](https://rustup.rs/). Restart the terminal after installation.
 
+## Company information
+
+Before making a distribution build, replace the placeholder values in [`app/company-info.json`](./app/company-info.json). Every platform build validates this file and includes it in the app interface, native resources, and supported package metadata. `address` and `trademarkNotice` may be empty; all other fields are required.
+
 ## macOS
 
 Build macOS on a Mac with Apple Command Line Tools or Xcode installed:

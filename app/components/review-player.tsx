@@ -3,6 +3,7 @@
 import { ChangeEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, FilePlus2, FolderOpen, Maximize2, Menu, Pause, PenLine, Play, Redo2, RotateCcw, Save, SkipBack, SkipForward, Trash2, Undo2, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { AnnotationOrganizer } from '@/components/annotation-organizer';
+import { AboutDialog } from '@/components/about-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -285,6 +286,6 @@ export function ReviewPlayer() {
         </div>
       </aside>
     </div>
-    <footer className="status-bar"><span className={`status-dot ${dirty ? 'dirty' : ''}`} /><output aria-live="polite">{status}</output><span className="shortcut-hint"><kbd>Space</kbd> play · <kbd>N</kbd> note · <kbd>⌘/Ctrl S</kbd> save</span>{deleted && <Button variant="ghost" size="sm" onClick={restoreDeleted}><RotateCcw />Undo delete</Button>}</footer>
+    <footer className="status-bar"><span className={`status-dot ${dirty ? 'dirty' : ''}`} /><output aria-live="polite">{status}</output><span className="shortcut-hint"><kbd>Space</kbd> play · <kbd>N</kbd> note · <kbd>⌘/Ctrl S</kbd> save</span>{deleted && <Button variant="ghost" size="sm" onClick={restoreDeleted}><RotateCcw />Undo delete</Button>}<AboutDialog /></footer>
   </main>;
 }

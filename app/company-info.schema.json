@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Game Note company information",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "companyName",
+    "legalName",
+    "copyright",
+    "website",
+    "supportEmail",
+    "supportUrl",
+    "privacyPolicyUrl",
+    "termsOfUseUrl",
+    "license",
+    "address",
+    "trademarkNotice"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "companyName": { "type": "string", "minLength": 1 },
+    "legalName": { "type": "string", "minLength": 1 },
+    "copyright": { "type": "string", "minLength": 1 },
+    "website": { "type": "string", "format": "uri" },
+    "supportEmail": { "type": "string", "format": "email" },
+    "supportUrl": { "type": "string", "format": "uri" },
+    "privacyPolicyUrl": { "type": "string", "format": "uri" },
+    "termsOfUseUrl": { "type": "string", "format": "uri" },
+    "license": { "type": "string", "minLength": 1 },
+    "address": { "type": "string" },
+    "trademarkNotice": { "type": "string" }
+  }
+}

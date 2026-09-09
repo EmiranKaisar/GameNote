@@ -19,7 +19,7 @@
     "mobile:init:android": "tauri android init",
     "mobile:init:ios": "tauri ios init",
     "tauri": "tauri",
-    "lint": "oxlint app components/annotation-organizer.tsx components/review-player.tsx components/ui/badge.tsx components/ui/button.tsx components/ui/textarea.tsx components/ui/toggle.tsx lib",
+    "lint": "oxlint app components/about-dialog.tsx components/annotation-organizer.tsx components/review-player.tsx components/ui/badge.tsx components/ui/button.tsx components/ui/textarea.tsx components/ui/toggle.tsx lib",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "format": "oxfmt",
     "typecheck": "tsc --noEmit"

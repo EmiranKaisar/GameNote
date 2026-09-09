@@ -7,11 +7,39 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(appRoot, '..');
 const buildRoot = join(repositoryRoot, 'build');
 const cargoTarget = join(buildRoot, 'cargo');
-const productName = JSON.parse(readFileSync(join(appRoot, 'src-tauri', 'tauri.conf.json'), 'utf8')).productName;
+const tauriConfig = JSON.parse(readFileSync(join(appRoot, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+const companyInfo = JSON.parse(readFileSync(join(appRoot, 'company-info.json'), 'utf8'));
+const productName = tauriConfig.productName;
 const normalizedProductName = productName.toLowerCase().replace(/[^a-z0-9]/g, '');
 const requested = process.argv[2];
 const host = process.platform;
 const npm = host === 'win32' ? 'npm.cmd' : 'npm';
+
+const requiredCompanyFields = ['companyName', 'legalName', 'copyright', 'website', 'supportEmail', 'supportUrl', 'privacyPolicyUrl', 'termsOfUseUrl', 'license', 'address', 'trademarkNotice'];
+for (const field of requiredCompanyFields) {
+  if (typeof companyInfo[field] !== 'string' || (!['address', 'trademarkNotice'].includes(field) && !companyInfo[field].trim())) {
+    console.error(`company-info.json must contain a valid "${field}" string.`);
+    process.exit(2);
+  }
+}
+for (const field of ['website', 'supportUrl', 'privacyPolicyUrl', 'termsOfUseUrl']) {
+  try { new URL(companyInfo[field]); } catch { console.error(`company-info.json contains an invalid URL in "${field}".`); process.exit(2); }
+}
+if (!/^\S+@\S+\.\S+$/.test(companyInfo.supportEmail)) {
+  console.error('company-info.json contains an invalid "supportEmail" value.');
+  process.exit(2);
+}
+
+const companyBuildConfig = JSON.stringify({
+  bundle: {
+    publisher: companyInfo.legalName,
+    homepage: companyInfo.website,
+    copyright: companyInfo.copyright,
+    license: companyInfo.license,
+    longDescription: `${tauriConfig.bundle.shortDescription}. Developed by ${companyInfo.companyName}.`,
+    resources: { '../company-info.json': 'company-info.json' },
+  },
+});
 
 const definitions = {
   macos: { hosts: ['darwin'], folder: 'macos', args: ['build', '--bundles', 'app'] },
@@ -51,7 +79,7 @@ if (requested === 'macos-universal') {
 }
 
 mkdirSync(buildRoot, { recursive: true });
-run(npm, ['exec', '--', 'tauri', ...definition.args]);
+run(npm, ['exec', '--', 'tauri', ...definition.args, '--config', companyBuildConfig]);
 
 const output = join(buildRoot, definition.folder);
 rmSync(output, { recursive: true, force: true });
@@ -95,3 +123,4 @@ if (!copied.length) {
 
 console.log(`\nGame Note ${requested} artifacts:`);
 for (const artifact of copied) console.log(`- ${artifact}`);
+console.log(`Company metadata: ${companyInfo.legalName}`);

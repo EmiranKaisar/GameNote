@@ -38,6 +38,12 @@ Open `build/macos/Game Note.app` after the command finishes. All generated packa
 
 See [BUILDING.md](./BUILDING.md) for every platform command and one-time SDK setup.
 
+## Company information
+
+Edit [`app/company-info.json`](./app/company-info.json) before distributing Game Note. It is the single template for the company name, legal entity, copyright, website, support contact, privacy policy, terms, license, address, and trademark notice.
+
+Every `npm run build:*` command validates this file. Its values appear in the in-app **About** dialog, are compiled into the web interface, are copied into native application resources, and populate supported installer/package metadata such as publisher, homepage, copyright, and license. Keep every field in the file; use an empty string only for the optional `address` and `trademarkNotice` fields.
+
 ## Quality checks
 
 ```sh
@@ -54,6 +60,7 @@ npm run build:web
 .
 ├── app/
 │   ├── components/       React application UI
+│   ├── company-info.json Company information build template
 │   ├── lib/              Browser and native project bridges
 │   ├── scripts/          Cross-platform packaging scripts
 │   ├── src/              Vite entry point
