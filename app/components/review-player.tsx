@@ -1,9 +1,13 @@
 'use client';
 
 import { ChangeEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, FilePlus2, FolderOpen, Maximize2, Menu, Pause, PenLine, Play, Redo2, RotateCcw, Save, SkipBack, SkipForward, Trash2, Undo2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { ChevronLeft, ChevronRight, Download, FilePlus2, FolderOpen, Maximize2, Menu, Pause, PenLine, Play, Redo2, RotateCcw, Save, SkipBack, SkipForward, Trash2, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import { AnnotationOrganizer } from '@/components/annotation-organizer';
 import { AboutDialog } from '@/components/about-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,6 +54,7 @@ export function ReviewPlayer() {
   const videoInputRef = useRef<HTMLInputElement>(null), projectInputRef = useRef<HTMLInputElement>(null);
   const currentStrokeRef = useRef<Stroke | null>(null);
   const latestHasVideoRef = useRef(false), latestTimeRef = useRef(0);
+  const dirtyRef = useRef(false), pendingActionRef = useRef<null | (() => void | Promise<void>)>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null), [nativeVideoPath, setNativeVideoPath] = useState<string | null>(null), [nativeProjectDir, setNativeProjectDir] = useState<string | null>(null), [videoUrl, setVideoUrl] = useState(''), [videoMime, setVideoMime] = useState('video/mp4');
   const [title, setTitle] = useState('Untitled review'), [projectId, setProjectId] = useState<string>(() => crypto.randomUUID()), [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
   const [duration, setDuration] = useState(0), [currentTime, setCurrentTime] = useState(0), [playing, setPlaying] = useState(false), [volume, setVolume] = useState(1);
@@ -58,6 +63,7 @@ export function ReviewPlayer() {
   const [draft, setDraft] = useState<Annotation | null>(null), [originalDraft, setOriginalDraft] = useState<Annotation | null>(null), [redoStack, setRedoStack] = useState<Stroke[]>([]);
   const [penActive, setPenActive] = useState(false), [penColor, setPenColor] = useState(COLORS[2]);
   const [dirty, setDirty] = useState(false), [saving, setSaving] = useState(false), [status, setStatus] = useState('Open a match video to begin reviewing.');
+  const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false), [pendingClose, setPendingClose] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false), [deleted, setDeleted] = useState<{ annotation: Annotation; organization: AnnotationOrganization } | null>(null);
 
   const selected = useMemo(() => annotations.find((item) => item.id === selectedId) ?? null, [annotations, selectedId]);
@@ -66,6 +72,10 @@ export function ReviewPlayer() {
   const organized = useMemo(() => { const byId = new Map(annotations.map((item) => [item.id, item])); return flattenAnnotationIds(organization).map((id) => byId.get(id)).filter((item): item is Annotation => Boolean(item)); }, [annotations, organization]);
   const native = runsNatively();
   const hasVideo = Boolean(videoFile || nativeVideoPath);
+  const updateDirty = useCallback((value: boolean) => {
+    dirtyRef.current = value; setDirty(value);
+    if (native) void invoke('set_dirty_state', { dirty: value }).catch(() => undefined);
+  }, [native]);
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current, stage = stageRef.current, video = videoRef.current;
@@ -92,7 +102,7 @@ export function ReviewPlayer() {
   useEffect(() => { drawCanvas(); const observer = new ResizeObserver(drawCanvas); if (stageRef.current) observer.observe(stageRef.current); return () => observer.disconnect(); }, [drawCanvas]);
   useEffect(() => () => { if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, [dirty]);
-  useEffect(() => { latestHasVideoRef.current = hasVideo; latestTimeRef.current = currentTime; }, [hasVideo, currentTime]);
+  useEffect(() => { latestHasVideoRef.current = hasVideo; latestTimeRef.current = currentTime; dirtyRef.current = dirty; }, [hasVideo, currentTime, dirty]);
   useEffect(() => {
     if ('serviceWorker' in navigator && import.meta.env.PROD && !native) void navigator.serviceWorker.register('/sw.js');
   }, [native]);
@@ -115,21 +125,20 @@ export function ReviewPlayer() {
         setAnnotations((items) => [...items, annotation]);
         setOrganization((current) => addAnnotationAtTop(current, annotation.id));
         setSelectedId(annotation.id);
-        setDirty(true);
+        updateDirty(true);
         setStatus('Text annotation added.');
         return { id: annotation.id, timeUs: annotation.timeUs, saved: true };
       },
     }, { signal: lifecycle.signal })).catch(() => undefined);
     return () => lifecycle.abort();
-  }, []);
+  }, [updateDirty]);
 
-  const canReplace = () => !dirty || window.confirm('Discard unsaved changes and continue?');
   const loadVideo = (file: File, options?: Partial<ProjectData>) => {
     if (videoUrl.startsWith('blob:')) URL.revokeObjectURL(videoUrl);
     setNativeVideoPath(null); setNativeProjectDir(null); setVideoFile(file); setVideoUrl(URL.createObjectURL(file)); setVideoMime(file.type || 'video/mp4'); setTitle(options?.title ?? file.name.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
     const sanitized = sanitizeAnnotations(options?.annotations ?? []), loadedAnnotations = sanitized.annotations, normalized = normalizeOrganization(loadedAnnotations, options?.organization);
-    setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
+    setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); updateDirty(!options);
     setStatus(options ? sanitized.recovered || normalized.recovered ? 'Project opened. Damaged annotation data was repaired in memory; save to keep the repair.' : 'Project opened.' : 'Video ready. Add a note at any important moment.');
     requestAnimationFrame(() => { if (videoRef.current) videoRef.current.currentTime = (options?.lastPlayheadUs ?? 0) / 1_000_000; });
   };
@@ -140,23 +149,26 @@ export function ReviewPlayer() {
     setVideoFile(null); setNativeVideoPath(path); setNativeProjectDir(options?.projectDir ?? null); setVideoUrl(prepared.url); setVideoMime(prepared.mediaType); setTitle(options?.title ?? filename.replace(/\.[^.]+$/, ''));
     setProjectId(options?.projectId ?? crypto.randomUUID()); setCreatedAt(options?.createdAt ?? new Date().toISOString());
     const sanitized = sanitizeAnnotations(options?.annotations ?? []), loadedAnnotations = sanitized.annotations, normalized = normalizeOrganization(loadedAnnotations, options?.organization);
-    setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); setDirty(!options);
+    setAnnotations(loadedAnnotations); setOrganization(normalized.organization); setCurrentTime((options?.lastPlayheadUs ?? 0) / 1_000_000); setSelectedId(null); setDraft(null); updateDirty(!options);
     setStatus(options ? sanitized.recovered || normalized.recovered ? 'Project opened. Damaged annotation data was repaired in memory; save to keep the repair.' : 'Project opened.' : 'Video ready. Add a note at any important moment.');
     requestAnimationFrame(() => { if (videoRef.current) videoRef.current.currentTime = (options?.lastPlayheadUs ?? 0) / 1_000_000; });
   };
-  const chooseVideo = async () => {
-    if (!canReplace()) return;
+  const chooseVideoNow = async () => {
     if (!native) { videoInputRef.current?.click(); return; }
     try { const path = await pickNativeVideo(); if (path) await loadNativeVideo(path); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'The video could not be opened.'); }
   };
-  const onVideoChosen = (event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (file && canReplace()) loadVideo(file); };
+  const onVideoChosen = (event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) loadVideo(file); };
   const onProjectChosen = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; event.target.value = ''; if (!file || !canReplace()) return;
+    const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
     try { setStatus('Opening project…'); const project = await readPortableProject(file); loadVideo(project.video, project); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'The project could not be opened.'); }
   };
-  const openFolder = async () => { if (!canReplace()) return; try { setStatus('Opening project folder…'); if (native) { const project = await pickAndOpenNativeProject(); if (project) await loadNativeVideo(project.videoPath, project); } else { const project = await readProjectFolder(); loadVideo(project.video, project); } } catch (error) { if ((error as DOMException)?.name !== 'AbortError') setStatus(error instanceof Error ? error.message : 'The folder could not be opened.'); } };
+  const openProjectNow = async () => {
+    if (!native && !window.showDirectoryPicker) { projectInputRef.current?.click(); return; }
+    try { setStatus('Opening project…'); if (native) { const project = await pickAndOpenNativeProject(); if (project) await loadNativeVideo(project.videoPath, project); } else { const project = await readProjectFolder(); loadVideo(project.video, project); } }
+    catch (error) { if ((error as DOMException)?.name !== 'AbortError') setStatus(error instanceof Error ? error.message : 'The project could not be opened.'); }
+  };
   const togglePlayback = async () => { const video = videoRef.current; if (!hasVideo || !video) return; if (video.paused) { setSelectedId(null); await video.play(); } else video.pause(); };
   const seek = (seconds: number) => { const video = videoRef.current; if (!video) return; video.currentTime = Math.min(Math.max(seconds, 0), duration || 0); setCurrentTime(video.currentTime); };
 
@@ -169,7 +181,7 @@ export function ReviewPlayer() {
   };
   const finishAnnotation = () => {
     if (!draft) return; const hasContent = draft.note.trim() || draft.drawing.strokes.length;
-    if (hasContent) { const saved = { ...draft, note: draft.note.trim(), updatedAt: new Date().toISOString() }; setAnnotations((items) => [...items.filter((item) => item.id !== saved.id), saved]); if (!originalDraft) setOrganization((current) => addAnnotationAtTop(current, saved.id)); setSelectedId(saved.id); setDirty(true); setStatus('Annotation saved to this review.'); }
+    if (hasContent) { const saved = { ...draft, note: draft.note.trim(), updatedAt: new Date().toISOString() }; setAnnotations((items) => [...items.filter((item) => item.id !== saved.id), saved]); if (!originalDraft) setOrganization((current) => addAnnotationAtTop(current, saved.id)); setSelectedId(saved.id); updateDirty(true); setStatus('Annotation saved to this review.'); }
     else { setSelectedId(null); setStatus('Empty annotation discarded.'); }
     setDraft(null); setOriginalDraft(null); setPenActive(false); setRedoStack([]);
   };
@@ -189,29 +201,58 @@ export function ReviewPlayer() {
   const endStroke = () => { currentStrokeRef.current = null; };
 
   const selectAnnotation = (annotation: Annotation) => { if (draft) return; videoRef.current?.pause(); seek(annotation.timeUs / 1_000_000); setSelectedId(annotation.id); setStatus(`Annotation at ${formatTime(annotation.timeUs / 1_000_000)}.`); };
-  const deleteSelected = () => { if (!selected) return; setDeleted({ annotation: selected, organization }); setAnnotations((items) => items.filter((item) => item.id !== selected.id)); setOrganization((current) => removeAnnotation(current, selected.id)); setSelectedId(null); setDirty(true); setStatus('Annotation deleted. Undo is available.'); };
-  const restoreDeleted = () => { if (!deleted) return; setAnnotations((items) => [...items, deleted.annotation]); setOrganization(deleted.organization); setSelectedId(deleted.annotation.id); setDeleted(null); setDirty(true); setStatus('Annotation restored.'); };
+  const deleteSelected = () => { if (!selected) return; setDeleted({ annotation: selected, organization }); setAnnotations((items) => items.filter((item) => item.id !== selected.id)); setOrganization((current) => removeAnnotation(current, selected.id)); setSelectedId(null); updateDirty(true); setStatus('Annotation deleted. Undo is available.'); };
+  const restoreDeleted = () => { if (!deleted) return; setAnnotations((items) => [...items, deleted.annotation]); setOrganization(deleted.organization); setSelectedId(deleted.annotation.id); setDeleted(null); updateDirty(true); setStatus('Annotation restored.'); };
   const projectData = (): ProjectData | null => videoFile ? { title, projectId, createdAt, annotations: sorted, organization, lastPlayheadUs: Math.round(currentTime * 1_000_000), video: videoFile } : null;
   const downloadProject = (data: ProjectData) => { const url = URL.createObjectURL(createPortableProject(data)), anchor = document.createElement('a'); anchor.href = url; anchor.download = `${title.replace(/[^a-z0-9 _-]/gi, '_') || 'match-video'}.matchproject`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1_000); };
-  const saveProject = async () => {
-    if (!hasVideo) return;
+  const saveProject = async (): Promise<boolean> => {
+    if (!hasVideo) return false;
     setSaving(true); setStatus('Saving project…');
     try {
       if (nativeVideoPath) {
         const saved = await saveNativeProject({ sourceVideoPath: nativeVideoPath, title, projectId, createdAt, updatedAt: new Date().toISOString(), annotations: sorted, organization, lastPlayheadUs: Math.round(currentTime * 1_000_000) }, nativeProjectDir);
-        if (!saved) { setStatus('Save canceled.'); return; }
+        if (!saved) { setStatus('Save canceled.'); return false; }
         setNativeProjectDir(saved.projectDir); setNativeVideoPath(saved.videoPath);
         setStatus(nativeProjectDir ? 'Project saved.' : `Project folder saved to ${saved.projectDir}.`);
       } else {
-        const data = projectData(); if (!data) return;
+        const data = projectData(); if (!data) return false;
         const folder = await saveProjectFolder(data); if (!folder) downloadProject(data);
         setStatus(folder ? 'Project folder saved.' : 'Portable project downloaded.');
       }
-      setDirty(false);
-    } catch (error) { setStatus((error as DOMException)?.name === 'AbortError' ? 'Save canceled.' : error instanceof Error ? error.message : 'The project could not be saved.'); }
+      updateDirty(false);
+      return true;
+    } catch (error) { setStatus((error as DOMException)?.name === 'AbortError' ? 'Save canceled.' : error instanceof Error ? error.message : 'The project could not be saved.'); return false; }
     finally { setSaving(false); }
   };
-  const exportPortable = () => { const data = projectData(); if (!data) return; downloadProject(data); setDirty(false); setStatus('Portable project downloaded.'); };
+  const requestAfterUnsavedCheck = useCallback((action: () => void | Promise<void>, closing = false) => {
+    if (!dirtyRef.current) { void action(); return; }
+    pendingActionRef.current = action; setPendingClose(closing); setShowUnsavedPrompt(true);
+  }, []);
+  const continuePendingAction = async (saveFirst: boolean) => {
+    if (saveFirst && !(await saveProject())) return;
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null; setShowUnsavedPrompt(false); setPendingClose(false);
+    await action?.();
+  };
+  const cancelPendingAction = () => { pendingActionRef.current = null; setShowUnsavedPrompt(false); setPendingClose(false); };
+  const chooseVideo = () => requestAfterUnsavedCheck(chooseVideoNow);
+  const openProject = () => requestAfterUnsavedCheck(openProjectNow);
+
+  useEffect(() => {
+    if (!native) return;
+    let disposed = false, unlistenClose: (() => void) | undefined, unlistenExit: (() => void) | undefined;
+    const requestNativeQuit = () => requestAfterUnsavedCheck(() => invoke('quit_app'), true);
+    const closePromise = getCurrentWindow().onCloseRequested((event) => {
+      if (!dirtyRef.current) return;
+      event.preventDefault();
+      requestNativeQuit();
+    });
+    const exitPromise = listen('game-note://exit-requested', requestNativeQuit);
+    void closePromise.then((unlisten) => { if (disposed) unlisten(); else unlistenClose = unlisten; });
+    void exitPromise.then((unlisten) => { if (disposed) unlisten(); else unlistenExit = unlisten; });
+    return () => { disposed = true; unlistenClose?.(); unlistenExit?.(); };
+  }, [native, requestAfterUnsavedCheck]);
+  const exportPortable = () => { const data = projectData(); if (!data) return; downloadProject(data); updateDirty(false); setStatus('Portable project downloaded.'); };
 
   const onKeyDown = (event: KeyboardEvent) => {
     const typing = ['TEXTAREA', 'INPUT'].includes((event.target as HTMLElement).tagName), modifier = event.ctrlKey || event.metaKey;
@@ -238,9 +279,8 @@ export function ReviewPlayer() {
     <header className="app-header">
       <div className="brand-lockup"><div className="brand-mark"><BrandGlyph /></div><div><div className="brand-name">Game Note</div><div className="project-name">{title}{dirty ? ' •' : ''}</div></div></div>
       <nav className="header-actions" aria-label="Project actions">
-        <Button variant="ghost" size="lg" onClick={() => void chooseVideo()}><FilePlus2 /><span className="desktop-label">Open video</span></Button>
-        <Button variant="ghost" size="lg" onClick={() => projectInputRef.current?.click()}><Upload /><span className="desktop-label">Open file</span></Button>
-        {(native || (typeof window !== 'undefined' && window.showDirectoryPicker)) && <Button variant="ghost" size="lg" onClick={() => void openFolder()}><FolderOpen /><span className="desktop-label">Open folder</span></Button>}
+        <Button variant="ghost" size="lg" onClick={chooseVideo}><FilePlus2 /><span className="desktop-label">Import Video</span></Button>
+        <Button variant="ghost" size="lg" onClick={openProject}><FolderOpen /><span className="desktop-label">Open Project</span></Button>
         <Button className="save-button" size="lg" disabled={!hasVideo || saving} onClick={() => void saveProject()}><Save />{saving ? 'Saving…' : 'Save'}</Button>
         <Button className="mobile-menu" variant="ghost" size="icon-lg" onClick={() => setShowSidebar((value) => !value)} aria-label="Toggle annotations"><Menu /></Button>
       </nav>
@@ -249,7 +289,7 @@ export function ReviewPlayer() {
       <section className="player-column" aria-label="Video review workspace">
         <div ref={stageRef} className={`video-stage ${penActive ? 'is-drawing' : ''}`}>
           {videoUrl ? <video key={videoUrl} ref={videoRef} playsInline onLoadedMetadata={(event) => { setDuration(event.currentTarget.duration); event.currentTarget.volume = volume; drawCanvas(); }} onTimeUpdate={(event) => { setCurrentTime(event.currentTarget.currentTime); if (selected && Math.abs(event.currentTarget.currentTime - selected.timeUs / 1_000_000) > .05) setSelectedId(null); }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={(event) => setStatus(`Video could not be decoded or streamed (media error ${event.currentTarget.error?.code ?? 'unknown'}).`)}><source src={videoUrl} type={videoMime} /><track kind="captions" src="/empty.vtt" srcLang="en" label="Captions" /></video>
-            : <button className="empty-stage" onClick={() => void chooseVideo()}><span className="empty-icon"><BrandGlyph /></span><strong>Open a match video</strong><span>MP4, MOV, MKV, AVI, or WebM</span></button>}
+            : <button className="empty-stage" onClick={chooseVideo}><span className="empty-icon"><BrandGlyph /></span><strong>Import a match video</strong><span>MP4, MOV, MKV, AVI, or WebM</span></button>}
           <canvas ref={canvasRef} className="drawing-canvas" aria-label="Drawing layer" onPointerDown={beginStroke} onPointerMove={extendStroke} onPointerUp={endStroke} onPointerCancel={endStroke} />
           {displayed && !draft && <Badge className="overlay-badge">ANNOTATION · {formatTime(displayed.timeUs / 1_000_000)}</Badge>}
         </div>
@@ -279,13 +319,19 @@ export function ReviewPlayer() {
       <aside className={`annotation-sidebar ${showSidebar ? 'mobile-open' : ''}`} aria-label="Annotations">
         <div className="sidebar-header"><div><span className="eyebrow">MATCH REVIEW</span><h2>Annotations</h2></div><Badge variant="secondary">{annotations.length}</Badge></div>
         <div className="sidebar-nav"><Button variant="outline" size="icon-lg" onClick={() => adjacent(-1)} disabled={!annotations.length} aria-label="Previous annotation"><ChevronLeft /></Button><Button variant="outline" size="icon-lg" onClick={() => adjacent(1)} disabled={!annotations.length} aria-label="Next annotation"><ChevronRight /></Button><span>Jump between moments</span></div>
-        <AnnotationOrganizer key={projectId} annotations={annotations} organization={organization} selectedId={selectedId} hasVideo={hasVideo} onSelect={selectAnnotation} onChange={(next, message) => { setOrganization(next); setDeleted(null); setDirty(true); setStatus(message); }} />
+        <AnnotationOrganizer key={projectId} annotations={annotations} organization={organization} selectedId={selectedId} hasVideo={hasVideo} onSelect={selectAnnotation} onChange={(next, message) => { setOrganization(next); setDeleted(null); updateDirty(true); setStatus(message); }} />
         <div className="sidebar-footer">
-          <div className="mobile-project-actions"><Button variant="outline" size="lg" onClick={() => void chooseVideo()}><FilePlus2 />Open video</Button><Button variant="outline" size="lg" onClick={() => projectInputRef.current?.click()}><Upload />Open project</Button></div>
+          <div className="mobile-project-actions"><Button variant="outline" size="lg" onClick={chooseVideo}><FilePlus2 />Import Video</Button><Button variant="outline" size="lg" onClick={openProject}><FolderOpen />Open Project</Button></div>
           {videoFile && <Button variant="outline" size="lg" onClick={exportPortable}><Download />Download portable file</Button>}
         </div>
       </aside>
     </div>
+    <AlertDialog open={showUnsavedPrompt} onOpenChange={(open) => { if (!open) cancelPendingAction(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>Save changes to this project?</AlertDialogTitle><AlertDialogDescription>This project contains changes that have not been saved. Save them before {pendingClose ? 'closing Game Note' : 'continuing'}?</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel><AlertDialogAction variant="outline" disabled={saving} onClick={() => void continuePendingAction(false)}>Discard</AlertDialogAction><AlertDialogAction disabled={saving} onClick={() => void continuePendingAction(true)}><Save />{saving ? 'Saving…' : 'Save'}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <footer className="status-bar"><span className={`status-dot ${dirty ? 'dirty' : ''}`} /><output aria-live="polite">{status}</output><span className="shortcut-hint"><kbd>Space</kbd> play · <kbd>N</kbd> note · <kbd>⌘/Ctrl S</kbd> save</span>{deleted && <Button variant="ghost" size="sm" onClick={restoreDeleted}><RotateCcw />Undo delete</Button>}<AboutDialog /></footer>
   </main>;
 }

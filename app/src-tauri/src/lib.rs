@@ -10,12 +10,16 @@ use std::{
     fs,
     io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
-    sync::{Arc, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, RwLock,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::State;
+use tauri::{Emitter, Manager, State};
 
 struct VideoSource(Arc<RwLock<Option<PathBuf>>>);
+struct DirtyState(AtomicBool);
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,6 +125,17 @@ fn prepare_video(path: String, source: State<'_, VideoSource>) -> Result<String,
         .write()
         .map_err(|_| "The video source lock is unavailable.".to_string())? = Some(canonical);
     Ok(mime)
+}
+
+#[tauri::command]
+fn set_dirty_state(dirty: bool, state: State<'_, DirtyState>) {
+    state.0.store(dirty, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle, state: State<'_, DirtyState>) {
+    state.0.store(false, Ordering::SeqCst);
+    app.exit(0);
 }
 
 fn stream_response(
@@ -359,8 +374,9 @@ fn open_project(project_dir: String) -> Result<NativeProject, String> {
 pub fn run() {
     let video_source = Arc::new(RwLock::new(None));
     let protocol_source = Arc::clone(&video_source);
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .manage(VideoSource(video_source))
+        .manage(DirtyState(AtomicBool::new(false)))
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("stream", move |_context, request, responder| {
             let response = stream_response(request, &protocol_source).unwrap_or_else(|error| {
@@ -374,11 +390,25 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             prepare_video,
+            set_dirty_state,
+            quit_app,
             save_project,
             open_project
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Game Note");
+        .build(tauri::generate_context!())
+        .expect("error while building Game Note");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            let dirty = app_handle.state::<DirtyState>().0.load(Ordering::SeqCst);
+            if dirty {
+                api.prevent_exit();
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.emit("game-note://exit-requested", ());
+                }
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -454,7 +484,10 @@ mod tests {
         .expect("overwrite save");
 
         assert_eq!(second.project_dir, first.project_dir);
-        assert_eq!(fs::read(second.video_path).expect("read saved video"), b"video-two");
+        assert_eq!(
+            fs::read(second.video_path).expect("read saved video"),
+            b"video-two"
+        );
         fs::remove_dir_all(root).expect("remove fixture folder");
     }
 }

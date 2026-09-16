@@ -7,6 +7,7 @@
   --color-background: var(--background); --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans); --font-mono: var(--font-geist-mono);
   --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
@@ -15,7 +16,7 @@
   --radius-sm: calc(var(--radius) * .6); --radius-md: calc(var(--radius) * .8); --radius-lg: var(--radius); --radius-xl: calc(var(--radius) * 1.4);
 }
 
-:root { --font-geist-sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --font-geist-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; --background:#080d0b; --foreground:#f7f9f5; --card:#121916; --card-foreground:#f7f9f5; --primary:#caff45; --primary-foreground:#0b1008; --signal:#ffb33e; --secondary:#1b2520; --secondary-foreground:#edf2eb; --muted:#151d19; --muted-foreground:#96a29b; --accent:#26342d; --accent-foreground:#fff; --destructive:#ff6868; --border:#26332d; --input:#303d37; --ring:#caff45; --radius:.75rem; }
+:root { --font-geist-sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --font-geist-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; --background:#080d0b; --foreground:#f7f9f5; --card:#121916; --card-foreground:#f7f9f5; --popover:#121916; --popover-foreground:#f7f9f5; --primary:#caff45; --primary-foreground:#0b1008; --signal:#ffb33e; --secondary:#1b2520; --secondary-foreground:#edf2eb; --muted:#151d19; --muted-foreground:#96a29b; --accent:#26342d; --accent-foreground:#fff; --destructive:#ff6868; --border:#26332d; --input:#303d37; --ring:#caff45; --radius:.75rem; }
 * { box-sizing:border-box; border-color:var(--border); }
 html { background:var(--background); color-scheme:dark; }
 body { margin:0; background:var(--background); color:var(--foreground); font-family:var(--font-geist-sans),Arial,sans-serif; }
