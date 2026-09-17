@@ -37,7 +37,6 @@ node_modules/
 .next/
 .vinext/
 dist/
-/build/
 out/
 coverage/
 .wrangler/
@@ -45,6 +44,22 @@ outputs/
 work/
 *.tsbuildinfo
 next-env.d.ts
+
+# Native builds
+# Keep Cargo's multi-gigabyte compiler cache local. The four platform folders
+# are intentionally tracked so release packages can be committed when desired.
+/build/*
+!/build/README.md
+!/build/macos/
+!/build/macos/**
+!/build/windows/
+!/build/windows/**
+!/build/android/
+!/build/android/**
+!/build/ios/
+!/build/ios/**
+/build/cargo/
+/build/**/.DS_Store
 
 # Hosting and deployment output
 .vercel/

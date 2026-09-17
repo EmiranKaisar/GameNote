@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -82,8 +82,11 @@ mkdirSync(buildRoot, { recursive: true });
 run(npm, ['exec', '--', 'tauri', ...definition.args, '--config', companyBuildConfig]);
 
 const output = join(buildRoot, definition.folder);
+const outputReadme = join(output, 'README.md');
+const preservedReadme = existsSync(outputReadme) ? readFileSync(outputReadme, 'utf8') : null;
 rmSync(output, { recursive: true, force: true });
 mkdirSync(output, { recursive: true });
+if (preservedReadme !== null) writeFileSync(outputReadme, preservedReadme);
 
 const wantedExtensions = new Set(['.dmg', '.msi', '.exe', '.apk', '.aab', '.ipa']);
 const copied = [];

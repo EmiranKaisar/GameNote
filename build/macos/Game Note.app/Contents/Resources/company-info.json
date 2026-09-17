@@ -1,0 +1,14 @@
+{
+  "$schema": "./company-info.schema.json",
+  "companyName": "Em7 Games",
+  "legalName": "Hangzhou Amuswen Network Technology Co., Ltd.",
+  "copyright": "© 2026 Hangzhou Amuswen Network Technology Co., Ltd.. All rights reserved.",
+  "website": "https://example.com",
+  "supportEmail": "account@em7games.com",
+  "supportUrl": "https://example.com/support",
+  "privacyPolicyUrl": "https://example.com/privacy",
+  "termsOfUseUrl": "https://example.com/terms",
+  "license": "Proprietary",
+  "address": "",
+  "trademarkNotice": "Game Note is a trademark of Your Company Legal Name."
+}

@@ -1,6 +1,6 @@
 # Building Game Note
 
-Every command is run from the `app/` directory. Generated installers, application bundles, and Cargo caches are written below the repository’s ignored `build/` directory.
+Every command is run from the `app/` directory. Generated installers and application bundles are collected in the tracked platform folders below `build/`, where release packages may be committed for download. Intermediate Rust compilation output is written to the ignored `build/cargo/` directory.
 
 ## Common one-time setup
 

@@ -36,7 +36,7 @@ cd app
 npm ci
 ```
 
-Each platform build validates `company-info.json`, builds the Vite frontend, compiles the Tauri/Rust native shell, packages the application, and collects the result under the repository-level `build/<platform>/` folder. The complete `build/` folder is excluded by `.gitignore`.
+Each platform build validates `company-info.json`, builds the Vite frontend, compiles the Tauri/Rust native shell, packages the application, and collects the result under the repository-level `build/<platform>/` folder. The `macos/`, `windows/`, `android/`, and `ios/` distribution folders are tracked so release packages can be committed. The machine-specific `build/cargo/` compiler cache remains ignored.
 
 ### macOS
 
@@ -141,7 +141,7 @@ npm run build:web
 │   ├── scripts/          Cross-platform packaging scripts
 │   ├── src/              Vite entry point
 │   └── src-tauri/        Native Rust shell and file operations
-├── build/                Generated packages and caches (ignored)
+├── build/                Trackable platform packages; ignored Cargo cache
 ├── BUILDING.md           Platform build guide
 ├── CONTEXT.md            Shared product terminology
 ├── PRODUCT_DESIGN.md     Product behavior and acceptance criteria
