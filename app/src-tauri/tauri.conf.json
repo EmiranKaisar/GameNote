@@ -33,6 +33,15 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Hangzhou Amuswen Network Technology Co., Ltd.",
+    "copyright": "Copyright © 2026 Hangzhou Amuswen Network Technology Co., Ltd.",
+    "license": "MIT License",
+    "resources": {
+      "../company-info.json": "company-info.json",
+      "../../LICENSE": "LICENSE",
+      "../../PRIVACY.md": "PRIVACY.md",
+      "../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

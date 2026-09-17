@@ -15,15 +15,12 @@ const requested = process.argv[2];
 const host = process.platform;
 const npm = host === 'win32' ? 'npm.cmd' : 'npm';
 
-const requiredCompanyFields = ['companyName', 'legalName', 'copyright', 'website', 'supportEmail', 'supportUrl', 'privacyPolicyUrl', 'termsOfUseUrl', 'license', 'address', 'trademarkNotice'];
+const requiredCompanyFields = ['companyName', 'legalName', 'supportEmail', 'license'];
 for (const field of requiredCompanyFields) {
-  if (typeof companyInfo[field] !== 'string' || (!['address', 'trademarkNotice'].includes(field) && !companyInfo[field].trim())) {
+  if (typeof companyInfo[field] !== 'string' || !companyInfo[field].trim()) {
     console.error(`company-info.json must contain a valid "${field}" string.`);
     process.exit(2);
   }
-}
-for (const field of ['website', 'supportUrl', 'privacyPolicyUrl', 'termsOfUseUrl']) {
-  try { new URL(companyInfo[field]); } catch { console.error(`company-info.json contains an invalid URL in "${field}".`); process.exit(2); }
 }
 if (!/^\S+@\S+\.\S+$/.test(companyInfo.supportEmail)) {
   console.error('company-info.json contains an invalid "supportEmail" value.');
@@ -33,11 +30,15 @@ if (!/^\S+@\S+\.\S+$/.test(companyInfo.supportEmail)) {
 const companyBuildConfig = JSON.stringify({
   bundle: {
     publisher: companyInfo.legalName,
-    homepage: companyInfo.website,
-    copyright: companyInfo.copyright,
+    copyright: `Copyright © 2026 ${companyInfo.legalName}`,
     license: companyInfo.license,
     longDescription: `${tauriConfig.bundle.shortDescription}. Developed by ${companyInfo.companyName}.`,
-    resources: { '../company-info.json': 'company-info.json' },
+    resources: {
+      '../company-info.json': 'company-info.json',
+      '../../LICENSE': 'LICENSE',
+      '../../PRIVACY.md': 'PRIVACY.md',
+      '../../THIRD_PARTY_NOTICES.md': 'THIRD_PARTY_NOTICES.md',
+    },
   },
 });
 

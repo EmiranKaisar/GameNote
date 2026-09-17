@@ -2,8 +2,10 @@
 name = "game-note"
 version = "0.1.0"
 description = "A lightweight match-video review application"
-authors = ["Game Note contributors"]
+authors = ["Hangzhou Amuswen Network Technology Co., Ltd."]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/EmiranKaisar/MatchVideoPlayer"
 
 [lib]
 name = "game_note_lib"

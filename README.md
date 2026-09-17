@@ -114,11 +114,6 @@ The iOS artifacts are collected in `build/ios/`. Installing on devices or distri
 
 Native desktop builds are not generally cross-compiled: run the macOS command on macOS and the Windows command on Windows. See [BUILDING.md](./BUILDING.md) for detailed SDK setup, signing, troubleshooting, and optional packaging commands.
 
-## Company information
-
-Edit [`app/company-info.json`](./app/company-info.json) before distributing Game Note. It is the single template for the company name, legal entity, copyright, website, support contact, privacy policy, terms, license, address, and trademark notice.
-
-Every `npm run build:*` command validates this file. Its values appear in the in-app **About** dialog, are compiled into the web interface, are copied into native application resources, and populate supported installer/package metadata such as publisher, homepage, copyright, and license. Keep every field in the file; use an empty string only for the optional `address` and `trademarkNotice` fields.
 
 ## Quality checks
 
@@ -151,3 +146,7 @@ npm run build:web
 ## Platform note
 
 Video decoding is provided by each operating system WebView. H.264 video with AAC audio in MP4 or MOV is the safest compatibility baseline. A filename extension does not guarantee that the installed OS can decode the file’s internal codec.
+
+## Legal and privacy
+
+Game Note is open-source software released under the [MIT License](./LICENSE). See the [privacy policy](./PRIVACY.md) for the app's local data-handling practices and [third-party notices](./THIRD_PARTY_NOTICES.md) for dependency license information.
