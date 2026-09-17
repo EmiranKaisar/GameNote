@@ -10,7 +10,7 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
   return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
 }
 
-const repositoryUrl = 'https://github.com/EmiranKaisar/MatchVideoPlayer';
+const repositoryUrl = 'https://github.com/EmiranKaisar/GameNote';
 const legalDocumentUrl = (fileName: string) => `${repositoryUrl}/blob/master/${fileName}`;
 
 export function AboutDialog() {
