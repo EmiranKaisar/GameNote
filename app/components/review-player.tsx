@@ -241,9 +241,15 @@ export function ReviewPlayer() {
   useEffect(() => {
     if (!native) return;
     let disposed = false, unlistenClose: (() => void) | undefined, unlistenExit: (() => void) | undefined;
-    const requestNativeQuit = () => requestAfterUnsavedCheck(() => invoke('quit_app'), true);
+    const quitNativeApp = async () => {
+      try {
+        await invoke('quit_app');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Game Note could not exit.');
+      }
+    };
+    const requestNativeQuit = () => requestAfterUnsavedCheck(quitNativeApp, true);
     const closePromise = getCurrentWindow().onCloseRequested((event) => {
-      if (!dirtyRef.current) return;
       event.preventDefault();
       requestNativeQuit();
     });
