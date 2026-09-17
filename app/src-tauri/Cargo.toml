@@ -5,7 +5,7 @@ description = "A lightweight match-video review application"
 authors = ["Hangzhou Amuswen Network Technology Co., Ltd."]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/EmiranKaisar/MatchVideoPlayer"
+repository = "https://github.com/EmiranKaisar/GameNote"
 
 [lib]
 name = "game_note_lib"
