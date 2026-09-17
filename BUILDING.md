@@ -1,6 +1,6 @@
 # Building Game Note
 
-Every command is run from the `app/` directory. Generated installers and application bundles are collected in the tracked platform folders below `build/`, where release packages may be committed for download. Intermediate Rust compilation output is written to the ignored `build/cargo/` directory.
+Every command is run from the `app/` directory. Generated installers and application bundles are collected below `build/` and ignored by Git. Distribute finished binaries through GitHub Releases or the appropriate app store rather than committing them to repository history. Intermediate Rust compilation output is written to `build/cargo/`.
 
 ## Common one-time setup
 
@@ -105,6 +105,19 @@ Output: `build/ios/` with the collected iOS package. Device and App Store builds
 | iOS package | `npm run build:ios` | macOS | `build/ios/` |
 
 Cross-compiling a signed Windows or iOS release from macOS is not supported by this workflow; run the command on the required host or in a CI runner for that operating system.
+
+## GitHub desktop releases
+
+The workflow in `.github/workflows/release-desktop.yml` runs when a `v*` tag is pushed. The tag must exactly match the version in `app/release-info.json`; for version `1.0.0`, use tag `v1.0.0`. It builds the macOS DMG and Windows installers on native GitHub runners and publishes them as release assets.
+
+Before tagging, commit all release changes and validate the tag locally:
+
+```sh
+cd app
+npm run release:validate -- v1.0.0
+```
+
+Unsigned workflow artifacts are suitable for development distribution. Configure platform signing and macOS notarization before presenting them as trusted public releases. Android and iOS publishing remains separate because those platforms require store credentials and signing configuration.
 
 ## Packaged legal documents
 

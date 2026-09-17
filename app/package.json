@@ -18,6 +18,7 @@
     "build:windows": "node scripts/build-platform.mjs windows",
     "build:android": "node scripts/build-platform.mjs android",
     "build:ios": "node scripts/build-platform.mjs ios",
+    "release:validate": "node scripts/validate-release-tag.mjs",
     "mobile:init:android": "tauri android init",
     "mobile:init:ios": "tauri ios init",
     "tauri": "tauri",

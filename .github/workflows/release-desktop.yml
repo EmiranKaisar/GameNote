@@ -1,0 +1,91 @@
+name: Release desktop apps
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: node scripts/validate-release-tag.mjs "${{ github.ref_name }}"
+        working-directory: app
+      - run: npm run typecheck && npm run lint && npm test
+        working-directory: app
+
+  macos:
+    needs: validate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+        working-directory: app
+      - run: npm run build:mac:dmg
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-note-macos
+          path: build/macos-dmg/*.dmg
+          if-no-files-found: error
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+        working-directory: app
+      - run: npm run build:windows
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-note-windows
+          path: |
+            build/windows/*.exe
+            build/windows/*.msi
+          if-no-files-found: error
+
+  publish:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: game-note-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          RELEASE_SUMMARY=$(node -p "require('./app/release-info.json').updateSummary")
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --verify-tag \
+            --title "Game Note $RELEASE_TAG" \
+            --notes "$RELEASE_SUMMARY"

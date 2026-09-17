@@ -1,5 +1,0 @@
-{
-  "$schema": "./release-info.schema.json",
-  "version": "1.0.0",
-  "updateSummary": "Initial release with match-video review, frame notes, drawing overlays, annotation topics, and portable project files."
-}

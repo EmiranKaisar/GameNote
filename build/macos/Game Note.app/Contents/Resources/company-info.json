@@ -1,7 +1,0 @@
-{
-  "$schema": "./company-info.schema.json",
-  "companyName": "Em7 Games",
-  "legalName": "Hangzhou Amuswen Network Technology Co., Ltd.",
-  "supportEmail": "account@em7games.com",
-  "license": "MIT License"
-}

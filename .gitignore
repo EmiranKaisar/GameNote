@@ -46,19 +46,18 @@ work/
 next-env.d.ts
 
 # Native builds
-# Keep Cargo's multi-gigabyte compiler cache local. The four platform folders
-# are intentionally tracked so release packages can be committed when desired.
-/build/*
+# Generated applications and installers stay local or are uploaded to GitHub
+# Releases. Keep only the documentation placeholders in the repository.
+/build/**
 !/build/README.md
 !/build/macos/
-!/build/macos/**
+!/build/macos/README.md
 !/build/windows/
-!/build/windows/**
+!/build/windows/README.md
 !/build/android/
-!/build/android/**
+!/build/android/README.md
 !/build/ios/
-!/build/ios/**
-/build/cargo/
+!/build/ios/README.md
 /build/**/.DS_Store
 
 # Hosting and deployment output

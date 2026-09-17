@@ -36,7 +36,7 @@ cd app
 npm ci
 ```
 
-Each platform build validates `company-info.json`, builds the Vite frontend, compiles the Tauri/Rust native shell, packages the application, and collects the result under the repository-level `build/<platform>/` folder. The `macos/`, `windows/`, `android/`, and `ios/` distribution folders are tracked so release packages can be committed. The machine-specific `build/cargo/` compiler cache remains ignored.
+Each platform build validates `company-info.json` and `release-info.json`, builds the Vite frontend, compiles the Tauri/Rust native shell, and collects generated output under `build/<platform>/`. Generated applications and installers are ignored by Git; publish them as versioned GitHub Release assets instead of committing them to repository history.
 
 ### macOS
 
@@ -137,7 +137,7 @@ npm run build:web
 │   ├── scripts/          Cross-platform packaging scripts
 │   ├── src/              Vite entry point
 │   └── src-tauri/        Native Rust shell and file operations
-├── build/                Trackable platform packages; ignored Cargo cache
+├── build/                Ignored local packages; tracked README placeholders
 ├── BUILDING.md           Platform build guide
 ├── CONTEXT.md            Shared product terminology
 ├── PRODUCT_DESIGN.md     Product behavior and acceptance criteria
@@ -151,6 +151,17 @@ Video decoding is provided by each operating system WebView. H.264 video with AA
 ## Release information
 
 [`app/release-info.json`](./app/release-info.json) is the single source of truth for the user-facing version and its short update description. Before each release, update `version` using semantic versioning without a leading `V` and write a concise `updateSummary`. The About dialog adds the `V` prefix automatically, and every native build uses the same version in its package metadata.
+
+## Publish a release
+
+Commit the release changes, then create and push the matching version tag. For example, when `release-info.json` contains `"version": "1.0.0"`:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The GitHub Actions workflow validates the tag, runs the quality checks, builds a macOS DMG and Windows installers on their native hosts, and attaches them to a GitHub Release. Android AAB/APK and iOS builds remain store/signing workflows and should be uploaded through Google Play and App Store Connect/TestFlight respectively.
 
 ## Legal and privacy
 
