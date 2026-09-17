@@ -14,6 +14,3 @@ Run commands from the `app/` directory after `npm ci`. Mobile projects also requ
 
 The build scripts replace the selected platform's collected output with the newest successful build. Upload finished desktop packages to a versioned GitHub Release rather than committing them. Android and iOS releases should go through their appropriate store or signed distribution workflow. Signing and notarization requirements still apply.
 
-## Why `cargo/` is not tracked
-
-`cargo/` is the Rust compiler target directory selected by `app/scripts/build-platform.mjs`. It contains downloaded dependency builds, intermediate object files, incremental compilation data, and temporary Tauri bundle output. It makes repeated local builds faster but is not a distributable Game Note package, can grow to several gigabytes, and is machine-specific. It remains ignored by Git and can be deleted safely when no build is running; Cargo recreates it during the next build.
