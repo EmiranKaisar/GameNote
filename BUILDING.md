@@ -17,6 +17,10 @@ To install Rust on a new build machine, follow [rustup.rs](https://rustup.rs/). 
 
 Before making a distribution build, update [`app/company-info.json`](./app/company-info.json). Every platform build validates its company name, legal name, support email, and license, then includes them in the app interface, native resources, and supported package metadata.
 
+## Release information
+
+Before each release, update [`app/release-info.json`](./app/release-info.json). Its semantic `version` and short `updateSummary` are the single source of truth used by the About dialog and native package metadata. Use `1.0.0`, not `V1.0.0`; the interface adds the `V` prefix.
+
 ## macOS
 
 Build macOS on a Mac with Apple Command Line Tools or Xcode installed:
@@ -104,4 +108,4 @@ Cross-compiling a signed Windows or iOS release from macOS is not supported by t
 
 ## Packaged legal documents
 
-Every native build includes the repository's `LICENSE`, `PRIVACY.md`, and `THIRD_PARTY_NOTICES.md`, together with `app/company-info.json`. Review the privacy policy and regenerate the third-party notice before a public release whenever data practices or dependencies change.
+Every native build includes the repository's `LICENSE`, `PRIVACY.md`, and `THIRD_PARTY_NOTICES.md`, together with `app/company-info.json` and `app/release-info.json`. Review the privacy policy and regenerate the third-party notice before a public release whenever data practices or dependencies change.

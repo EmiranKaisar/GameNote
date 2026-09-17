@@ -1,8 +1,8 @@
 'use client';
 
-import { Building2, Code2, FileText, Info, Mail, Scale, ScrollText } from 'lucide-react';
+import { Building2, Code2, FileText, Info, Mail, Scale, ScrollText, Sparkles } from 'lucide-react';
 import companyInfo from '@/company-info.json';
-import packageInfo from '@/package.json';
+import releaseInfo from '@/release-info.json';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -17,8 +17,9 @@ export function AboutDialog() {
   return <Dialog>
     <DialogTrigger render={<Button className="about-trigger" variant="ghost" size="sm" />}><Info />About</DialogTrigger>
     <DialogContent className="about-dialog">
-      <DialogHeader><DialogTitle>About Game Note</DialogTitle><DialogDescription>Version {packageInfo.version}</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>About Game Note</DialogTitle><DialogDescription>V{releaseInfo.version}</DialogDescription></DialogHeader>
       <div className="about-company"><span className="about-company-icon"><Building2 /></span><div><strong>{companyInfo.companyName}</strong><span>{companyInfo.legalName}</span></div></div>
+      <div className="about-release"><Sparkles /><div><strong>What’s new in V{releaseInfo.version}</strong><p>{releaseInfo.updateSummary}</p></div></div>
       <div className="about-links">
         <ExternalLink href={`mailto:${companyInfo.supportEmail}`}><Mail />{companyInfo.supportEmail}</ExternalLink>
         <ExternalLink href={repositoryUrl}><Code2 />Source Code</ExternalLink>

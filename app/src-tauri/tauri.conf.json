@@ -38,6 +38,7 @@
     "license": "MIT License",
     "resources": {
       "../company-info.json": "company-info.json",
+      "../release-info.json": "release-info.json",
       "../../LICENSE": "LICENSE",
       "../../PRIVACY.md": "PRIVACY.md",
       "../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"

@@ -9,6 +9,7 @@ const buildRoot = join(repositoryRoot, 'build');
 const cargoTarget = join(buildRoot, 'cargo');
 const tauriConfig = JSON.parse(readFileSync(join(appRoot, 'src-tauri', 'tauri.conf.json'), 'utf8'));
 const companyInfo = JSON.parse(readFileSync(join(appRoot, 'company-info.json'), 'utf8'));
+const releaseInfo = JSON.parse(readFileSync(join(appRoot, 'release-info.json'), 'utf8'));
 const productName = tauriConfig.productName;
 const normalizedProductName = productName.toLowerCase().replace(/[^a-z0-9]/g, '');
 const requested = process.argv[2];
@@ -27,7 +28,18 @@ if (!/^\S+@\S+\.\S+$/.test(companyInfo.supportEmail)) {
   process.exit(2);
 }
 
-const companyBuildConfig = JSON.stringify({
+const semanticVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+if (typeof releaseInfo.version !== 'string' || !semanticVersionPattern.test(releaseInfo.version)) {
+  console.error('release-info.json must contain a semantic "version" such as "1.0.0".');
+  process.exit(2);
+}
+if (typeof releaseInfo.updateSummary !== 'string' || !releaseInfo.updateSummary.trim() || releaseInfo.updateSummary.length > 240) {
+  console.error('release-info.json must contain an "updateSummary" between 1 and 240 characters.');
+  process.exit(2);
+}
+
+const buildConfig = JSON.stringify({
+  version: releaseInfo.version,
   bundle: {
     publisher: companyInfo.legalName,
     copyright: `Copyright © 2026 ${companyInfo.legalName}`,
@@ -35,6 +47,7 @@ const companyBuildConfig = JSON.stringify({
     longDescription: `${tauriConfig.bundle.shortDescription}. Developed by ${companyInfo.companyName}.`,
     resources: {
       '../company-info.json': 'company-info.json',
+      '../release-info.json': 'release-info.json',
       '../../LICENSE': 'LICENSE',
       '../../PRIVACY.md': 'PRIVACY.md',
       '../../THIRD_PARTY_NOTICES.md': 'THIRD_PARTY_NOTICES.md',
@@ -80,7 +93,7 @@ if (requested === 'macos-universal') {
 }
 
 mkdirSync(buildRoot, { recursive: true });
-run(npm, ['exec', '--', 'tauri', ...definition.args, '--config', companyBuildConfig]);
+run(npm, ['exec', '--', 'tauri', ...definition.args, '--config', buildConfig]);
 
 const output = join(buildRoot, definition.folder);
 const outputReadme = join(output, 'README.md');
@@ -128,3 +141,4 @@ if (!copied.length) {
 console.log(`\nGame Note ${requested} artifacts:`);
 for (const artifact of copied) console.log(`- ${artifact}`);
 console.log(`Company metadata: ${companyInfo.legalName}`);
+console.log(`Release: V${releaseInfo.version} — ${releaseInfo.updateSummary}`);

@@ -132,6 +132,7 @@ npm run build:web
 ├── app/
 │   ├── components/       React application UI
 │   ├── company-info.json Company information build template
+│   ├── release-info.json App version and update summary
 │   ├── lib/              Browser and native project bridges
 │   ├── scripts/          Cross-platform packaging scripts
 │   ├── src/              Vite entry point
@@ -146,6 +147,10 @@ npm run build:web
 ## Platform note
 
 Video decoding is provided by each operating system WebView. H.264 video with AAC audio in MP4 or MOV is the safest compatibility baseline. A filename extension does not guarantee that the installed OS can decode the file’s internal codec.
+
+## Release information
+
+[`app/release-info.json`](./app/release-info.json) is the single source of truth for the user-facing version and its short update description. Before each release, update `version` using semantic versioning without a leading `V` and write a concise `updateSummary`. The About dialog adds the `V` prefix automatically, and every native build uses the same version in its package metadata.
 
 ## Legal and privacy
 
