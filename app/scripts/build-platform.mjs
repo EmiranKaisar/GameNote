@@ -14,7 +14,7 @@ const productName = tauriConfig.productName;
 const normalizedProductName = productName.toLowerCase().replace(/[^a-z0-9]/g, '');
 const requested = process.argv[2];
 const host = process.platform;
-const npm = host === 'win32' ? 'npm.cmd' : 'npm';
+const tauriCli = join(appRoot, 'node_modules', '@tauri-apps', 'cli', 'tauri.js');
 
 const requiredCompanyFields = ['companyName', 'legalName', 'supportEmail', 'license'];
 for (const field of requiredCompanyFields) {
@@ -93,7 +93,11 @@ if (requested === 'macos-universal') {
 }
 
 mkdirSync(buildRoot, { recursive: true });
-run(npm, ['exec', '--', 'tauri', ...definition.args, '--config', buildConfig]);
+if (!existsSync(tauriCli)) {
+  console.error('The Tauri CLI is missing. Run "npm ci" in the app directory first.');
+  process.exit(2);
+}
+run(process.execPath, [tauriCli, ...definition.args, '--config', buildConfig]);
 
 const output = join(buildRoot, definition.folder);
 const outputReadme = join(output, 'README.md');
